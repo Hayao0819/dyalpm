@@ -1,0 +1,657 @@
+package alpm
+
+import (
+	stderrors "errors"
+	"runtime"
+	"unsafe"
+
+	"github.com/ebitengine/purego"
+
+	"github.com/Jguer/dyalpm/internal/dyerrors"
+	"github.com/Jguer/dyalpm/internal/lib"
+	"github.com/Jguer/dyalpm/internal/list"
+)
+
+// Handle represents an ALPM handle
+type Handle interface {
+	// Release releases the handle and cleans up resources
+	Release() error
+
+	LocalDB() (Database, error)
+	SyncDBs() ([]Database, error)
+	SyncDBListByDBName(name string) ([]Database, error)
+	SyncDBByName(name string) (Database, error)
+
+	// Transaction methods
+	TransInit(flags TransactionFlag) error
+	TransRelease() error
+	SyncSysupgrade(enableDowngrade bool) error
+	TransGetAdd() PackageIterator
+
+	// RegisterSyncDB registers a sync database
+	RegisterSyncDB(name string, siglevel int) (Database, error)
+
+	// Root returns the root path
+	Root() string
+
+	// DBPath returns the database path
+	DBPath() string
+
+	// Errno returns the current error code
+	Errno() dyerrors.Errno
+
+	// StrError returns the error string for an error code
+	StrError(errno dyerrors.Errno) string
+
+	// Options
+	SetLogFile(path string) error
+	LogFile() string
+	SetGPGDir(path string) error
+	GPGDir() string
+	SetUseSyslog(enable bool) error
+	UseSyslog() bool
+	SetCheckSpace(enable bool) error
+	CheckSpace() bool
+	SetDBExt(ext string) error
+	DBExt() string
+	SetDefaultSigLevel(level int) error
+	DefaultSigLevel() int
+	SetLocalFileSigLevel(level int) error
+	LocalFileSigLevel() int
+	SetRemoteFileSigLevel(level int) error
+	RemoteFileSigLevel() int
+	SetParallelDownloads(num int) error
+	ParallelDownloads() int
+
+	// Architecture
+	Architectures() ([]string, error)
+	SetArchitectures(archs []string) error
+	AddArchitecture(arch string) error
+	RemoveArchitecture(arch string) error
+
+	// List Options
+	CacheDirs() ([]string, error)
+	SetCacheDirs(dirs []string) error
+	AddCacheDir(dir string) error
+	RemoveCacheDir(dir string) error
+
+	HookDirs() ([]string, error)
+	SetHookDirs(dirs []string) error
+	AddHookDir(dir string) error
+	RemoveHookDir(dir string) error
+
+	NoUpgrades() ([]string, error)
+	SetNoUpgrades(paths []string) error
+	AddNoUpgrade(path string) error
+	RemoveNoUpgrade(path string) error
+	MatchNoUpgrade(path string) (int, error)
+
+	NoExtracts() ([]string, error)
+	SetNoExtracts(paths []string) error
+	AddNoExtract(path string) error
+	RemoveNoExtract(path string) error
+	MatchNoExtract(path string) (int, error)
+
+	IgnorePkgs() ([]string, error)
+	SetIgnorePkgs(pkgs []string) error
+	AddIgnorePkg(pkg string) error
+	RemoveIgnorePkg(pkg string) error
+
+	IgnoreGroups() ([]string, error)
+	SetIgnoreGroups(groups []string) error
+	AddIgnoreGroup(group string) error
+	RemoveIgnoreGroup(group string) error
+
+	OverwriteFiles() ([]string, error)
+	SetOverwriteFiles(globs []string) error
+	AddOverwriteFile(glob string) error
+	RemoveOverwriteFile(glob string) error
+
+	SetSandboxUser(user string) error
+	SandboxUser() string
+	SetDisableDLTimeout(disable bool) error
+	SetDisableSandbox(disable bool) error
+
+	// LoadPackage loads a package from a file
+	LoadPackage(filename string, full bool, siglevel int) (Package, error)
+
+	// DB Management
+	UnregisterAllSyncDBs() error
+
+	// Utils
+	LogAction(prefix, message string) error
+	Unlock() error
+	FetchPkgURL(url string) (string, error)
+	FindGroupPkgs(dbs []Database, name string) ([]Package, error)
+	ExtractKeyID(identifier string, sig []byte) ([]string, error)
+	InterruptTransaction() error
+	SandboxSetupChild(user, dir string) error
+
+	// Assume Installed
+	AssumeInstalled() ([]Dependency, error)
+	SetAssumeInstalled(deps []Dependency) error
+	AddAssumeInstalled(dep Dependency) error
+	RemoveAssumeInstalled(dep Dependency) error
+
+	// Dependency Resolution
+	CheckDeps(pkgs []Package, remPkgs []Package, upgradePkgs []Package, reverseDeps bool) ([]DepMissing, error)
+	CheckConflicts(pkgs []Package) ([]Conflict, error)
+	FindDBSatisfier(dbs []Database, depstring string) Package
+
+	// Callbacks (raw pointers)
+	//
+	// NOTE: libalpm's log callback (`alpm_cb_log`) uses a `va_list`, which cannot be
+	// safely bridged to a Go function without a C shim. This wrapper therefore
+	// exposes logcb as raw pointers only.
+	LogCallback() (cb uintptr, ctx uintptr)
+	SetLogCallback(cb uintptr, ctx uintptr) error
+
+	DownloadCallback() (cb uintptr, ctx uintptr)
+	SetDownloadCallback(cb uintptr, ctx uintptr) error
+	SetDownloadCallbackFunc(cb DownloadCallback) error
+
+	FetchCallback() (cb uintptr, ctx uintptr)
+	SetFetchCallback(cb uintptr, ctx uintptr) error
+	SetFetchCallbackFunc(cb FetchCallback) error
+
+	EventCallback() (cb uintptr, ctx uintptr)
+	SetEventCallback(cb uintptr, ctx uintptr) error
+	SetEventCallbackFunc(cb EventCallback) error
+
+	QuestionCallback() (cb uintptr, ctx uintptr)
+	SetQuestionCallback(cb uintptr, ctx uintptr) error
+	SetQuestionCallbackFunc(cb QuestionCallback) error
+
+	ProgressCallback() (cb uintptr, ctx uintptr)
+	SetProgressCallback(cb uintptr, ctx uintptr) error
+	SetProgressCallbackFunc(cb ProgressCallback) error
+}
+
+type handle struct {
+	ptr      uintptr
+	registry *lib.FunctionRegistry
+}
+
+// Initialize creates a new ALPM handle
+func Initialize(root, dbpath string) (Handle, error) {
+	reg, err := lib.GetRegistry()
+	if err != nil {
+		return nil, err
+	}
+
+	// Get function pointer for initialization
+	initFn, err := reg.GetFunc("alpm_initialize")
+	if err != nil {
+		return nil, err
+	}
+
+	// Call alpm_initialize
+	// Note: alpm_initialize signature is:
+	// alpm_handle_t *alpm_initialize(const char *root, const char *dbpath, alpm_errno_t *err)
+	// We need to pass a pointer to errno, but purego.SyscallN doesn't support output parameters directly
+	// We'll allocate space for the errno and check it after the call
+	var errnoVal dyerrors.Errno
+	errnoPtr := uintptr(unsafe.Pointer(&errnoVal))
+
+	// Create null-terminated strings
+	rootBytes := make([]byte, len(root)+1)
+	copy(rootBytes, root)
+	rootBytes[len(root)] = 0
+	rootPtr := uintptr(unsafe.Pointer(&rootBytes[0]))
+
+	dbpathBytes := make([]byte, len(dbpath)+1)
+	copy(dbpathBytes, dbpath)
+	dbpathBytes[len(dbpath)] = 0
+	dbpathPtr := uintptr(unsafe.Pointer(&dbpathBytes[0]))
+
+	handlePtr := lib.Syscall(initFn,
+		rootPtr,
+		dbpathPtr,
+		errnoPtr,
+	)
+
+	// Keep buffers alive during the call
+	runtime.KeepAlive(rootBytes)
+	runtime.KeepAlive(dbpathBytes)
+
+	if handlePtr == 0 {
+		// Check the errno value that was set
+		if errnoVal != dyerrors.ErrOK {
+			return nil, dyerrors.NewError(errnoVal, "failed to initialize ALPM handle")
+		}
+		return nil, dyerrors.NewError(dyerrors.ErrSystem, "failed to initialize ALPM handle")
+	}
+
+	return &handle{
+		ptr:      handlePtr,
+		registry: reg,
+	}, nil
+}
+
+func (h *handle) Release() error {
+	if h.ptr == 0 {
+		return stderrors.New("handle already released")
+	}
+
+	oldPtr := h.ptr
+
+	releaseFn, err := h.registry.GetFunc("alpm_release")
+	if err != nil {
+		return err
+	}
+
+	r1, _, errno := purego.SyscallN(releaseFn, h.ptr)
+	if errno != 0 || r1 != 0 {
+		return stderrors.New("failed to release handle")
+	}
+
+	unregisterCallbackSet(oldPtr)
+	h.ptr = 0
+	return nil
+}
+
+func (h *handle) Errno() dyerrors.Errno {
+	if h.ptr == 0 {
+		return dyerrors.ErrHandleNull
+	}
+
+	errnoFn, err := h.registry.GetFunc("alpm_errno")
+	if err != nil {
+		return dyerrors.ErrSystem
+	}
+
+	r1, _, _ := purego.SyscallN(errnoFn, h.ptr)
+	return dyerrors.Errno(r1)
+}
+
+func (h *handle) StrError(errno dyerrors.Errno) string {
+	strerrorFn, err := h.registry.GetFunc("alpm_strerror")
+	if err != nil {
+		return "unknown error"
+	}
+
+	r1, _, _ := purego.SyscallN(strerrorFn, uintptr(errno))
+	if r1 == 0 {
+		return "unknown error"
+	}
+
+	// Convert C string to Go string
+	// We need to find the null terminator
+	return lib.PtrToString(r1)
+}
+
+func (h *handle) Root() string {
+	if h.ptr == 0 {
+		return ""
+	}
+
+	getRootFn, err := h.registry.GetFunc("alpm_option_get_root")
+	if err != nil {
+		return ""
+	}
+
+	r1, _, _ := purego.SyscallN(getRootFn, h.ptr)
+	return lib.PtrToString(r1)
+}
+
+func (h *handle) DBPath() string {
+	if h.ptr == 0 {
+		return ""
+	}
+
+	getDBPathFn, err := h.registry.GetFunc("alpm_option_get_dbpath")
+	if err != nil {
+		return ""
+	}
+
+	r1, _, _ := purego.SyscallN(getDBPathFn, h.ptr)
+	return lib.PtrToString(r1)
+}
+
+func (h *handle) getLocalDB() (Database, error) {
+	if h.ptr == 0 {
+		return nil, stderrors.New("handle is invalid")
+	}
+
+	getLocalDBFn, err := h.registry.GetFunc("alpm_get_localdb")
+	if err != nil {
+		return nil, err
+	}
+
+	r1, _, _ := purego.SyscallN(getLocalDBFn, h.ptr)
+	if r1 == 0 {
+		return nil, dyerrors.NewError(h.Errno(), "failed to get local database")
+	}
+	dbPtr := r1
+
+	return newDatabase(dbPtr, h), nil
+}
+
+func (h *handle) getSyncDBs() ([]Database, error) {
+	if h.ptr == 0 {
+		return nil, stderrors.New("handle is invalid")
+	}
+
+	getSyncDBsFn, err := h.registry.GetFunc("alpm_get_syncdbs")
+	if err != nil {
+		return nil, err
+	}
+
+	r1, _, _ := purego.SyscallN(getSyncDBsFn, h.ptr)
+	if r1 == 0 {
+		errno := h.Errno()
+		if errno != dyerrors.ErrOK {
+			return nil, dyerrors.NewError(errno, "failed to get sync databases")
+		}
+		return []Database{}, nil
+	}
+	listPtr := r1
+
+	alpmList := list.NewList(listPtr)
+	if alpmList == nil {
+		return []Database{}, nil
+	}
+
+	var dbs []Database
+	for item := alpmList; item != nil && item.Ptr() != 0; item = item.Next() {
+		dbPtr := item.Data()
+		if dbPtr != 0 {
+			dbs = append(dbs, newDatabase(dbPtr, h))
+		}
+	}
+
+	return dbs, nil
+}
+
+// go-alpm/v2 compatible methods
+func (h *handle) LocalDB() (Database, error) {
+	return h.getLocalDB()
+}
+
+func (h *handle) SyncDBs() ([]Database, error) {
+	dbs, err := h.getSyncDBs()
+	if err != nil {
+		return nil, err
+	}
+	return dbs, nil
+}
+
+func (h *handle) SyncDBListByDBName(name string) ([]Database, error) {
+	dbs, err := h.getSyncDBs()
+	if err != nil {
+		return nil, err
+	}
+	for _, db := range dbs {
+		if db.Name() == name {
+			return []Database{db}, nil
+		}
+	}
+	return nil, stderrors.New("database not found: " + name)
+}
+
+func (h *handle) SyncDBByName(name string) (Database, error) {
+	dbs, err := h.getSyncDBs()
+	if err != nil {
+		return nil, err
+	}
+	for _, db := range dbs {
+		if db.Name() == name {
+			return db, nil
+		}
+	}
+	return nil, stderrors.New("database not found: " + name)
+}
+
+func (h *handle) TransInit(flags TransactionFlag) error {
+	if h.ptr == 0 {
+		return stderrors.New("invalid handle")
+	}
+
+	initFn, err := h.registry.GetFunc("alpm_trans_init")
+	if err != nil {
+		return err
+	}
+
+	result := lib.Syscall(initFn, h.ptr, uintptr(flags))
+	if result != 0 {
+		return stderrors.New("failed to initialize transaction")
+	}
+
+	return nil
+}
+
+func (h *handle) TransRelease() error {
+	if h.ptr == 0 {
+		return stderrors.New("invalid handle")
+	}
+
+	releaseFn, err := h.registry.GetFunc("alpm_trans_release")
+	if err != nil {
+		return err
+	}
+
+	result := lib.Syscall(releaseFn, h.ptr)
+	if result != 0 {
+		return stderrors.New("failed to release transaction")
+	}
+
+	return nil
+}
+
+func (h *handle) SyncSysupgrade(enableDowngrade bool) error {
+	if h.ptr == 0 {
+		return stderrors.New("invalid handle")
+	}
+
+	upgradeFn, err := h.registry.GetFunc("alpm_sync_sysupgrade")
+	if err != nil {
+		return err
+	}
+
+	downgrade := uintptr(0)
+	if enableDowngrade {
+		downgrade = 1
+	}
+
+	result := lib.Syscall(upgradeFn, h.ptr, downgrade)
+	if result != 0 {
+		return stderrors.New("failed to sync sysupgrade")
+	}
+
+	return nil
+}
+
+func (h *handle) TransGetAdd() PackageIterator {
+	if h.ptr == 0 {
+		return PackageIterator{}
+	}
+
+	getAddFn, err := h.registry.GetFunc("alpm_trans_get_add")
+	if err != nil {
+		return PackageIterator{}
+	}
+
+	listPtr := lib.Syscall(getAddFn, h.ptr)
+	if listPtr == 0 {
+		return PackageIterator{}
+	}
+
+	return newPackageIterator(listPtr, h, false)
+}
+
+func (h *handle) RegisterSyncDB(name string, siglevel int) (Database, error) {
+	if h.ptr == 0 {
+		return nil, stderrors.New("handle is invalid")
+	}
+
+	registerFn, err := h.registry.GetFunc("alpm_register_syncdb")
+	if err != nil {
+		return nil, err
+	}
+
+	nameBytes := lib.CString(name)
+	namePtr := uintptr(unsafe.Pointer(&nameBytes[0]))
+	r1, _, _ := purego.SyscallN(registerFn, h.ptr, namePtr, uintptr(siglevel))
+	runtime.KeepAlive(nameBytes)
+	if r1 == 0 {
+		return nil, dyerrors.NewError(h.Errno(), "failed to register sync database")
+	}
+	dbPtr := r1
+
+	return newDatabase(dbPtr, h), nil
+}
+
+func (h *handle) UnregisterAllSyncDBs() error {
+	if h.ptr == 0 {
+		return dyerrors.ErrHandleNull
+	}
+
+	unregisterFn, err := h.registry.GetFunc("alpm_unregister_all_syncdbs")
+	if err != nil {
+		return err
+	}
+
+	result := lib.Syscall(unregisterFn, h.ptr)
+	if result != 0 {
+		return ErrDatabaseUnregisterFailed
+	}
+
+	return nil
+}
+
+func (h *handle) LogAction(prefix, message string) error {
+	if h.ptr == 0 {
+		return dyerrors.ErrHandleNull
+	}
+
+	fn, err := h.registry.GetFunc("alpm_logaction")
+	if err != nil {
+		return err
+	}
+
+	cPrefix := lib.CString(prefix)
+	cMsg := lib.CString(message)
+	cFmt := lib.CString("%s")
+
+	r1, _, _ := purego.SyscallN(
+		fn,
+		h.ptr,
+		uintptr(unsafe.Pointer(&cPrefix[0])),
+		uintptr(unsafe.Pointer(&cFmt[0])),
+		uintptr(unsafe.Pointer(&cMsg[0])),
+	)
+
+	runtime.KeepAlive(cPrefix)
+	runtime.KeepAlive(cMsg)
+	runtime.KeepAlive(cFmt)
+
+	if r1 != 0 {
+		return stderrors.New("failed to log action")
+	}
+	return nil
+}
+
+func (h *handle) Unlock() error {
+	if h.ptr == 0 {
+		return dyerrors.ErrHandleNull
+	}
+
+	fn, err := h.registry.GetFunc("alpm_unlock")
+	if err != nil {
+		return err
+	}
+
+	r1, _, _ := purego.SyscallN(fn, h.ptr)
+	if r1 != 0 {
+		return stderrors.New("failed to unlock")
+	}
+
+	return nil
+}
+
+func (h *handle) FetchPkgURL(url string) (string, error) {
+	if h.ptr == 0 {
+		return "", dyerrors.ErrHandleNull
+	}
+
+	fn, err := h.registry.GetFunc("alpm_fetch_pkgurl")
+	if err != nil {
+		return "", err
+	}
+
+	// alpm_fetch_pkgurl(handle, urls_list, &fetched_list)
+	cURL := lib.CString(url)
+	urlList := list.Add(nil, uintptr(unsafe.Pointer(&cURL[0])))
+	if urlList == nil {
+		return "", stderrors.New("failed to create URL list")
+	}
+	defer urlList.Free()
+
+	var fetchedListPtr uintptr
+	r1, _, _ := purego.SyscallN(fn, h.ptr, urlList.Ptr(), uintptr(unsafe.Pointer(&fetchedListPtr)))
+	runtime.KeepAlive(cURL)
+
+	if r1 != 0 {
+		return "", stderrors.New("failed to fetch package URL")
+	}
+
+	if fetchedListPtr == 0 {
+		return "", nil
+	}
+
+	fetchedList := list.NewList(fetchedListPtr)
+	defer fetchedList.Free()
+
+	// Return the first fetched path (since we only requested one URL)
+	if fetchedList.Ptr() != 0 {
+		ptr := fetchedList.Data()
+		if ptr != 0 {
+			return lib.PtrToString(ptr), nil
+		}
+	}
+
+	return "", nil
+}
+
+func (h *handle) InterruptTransaction() error {
+	if h.ptr == 0 {
+		return dyerrors.ErrHandleNull
+	}
+
+	fn, err := h.registry.GetFunc("alpm_trans_interrupt")
+	if err != nil {
+		return err
+	}
+
+	r1, _, _ := purego.SyscallN(fn, h.ptr)
+	if r1 != 0 {
+		return stderrors.New("failed to interrupt transaction")
+	}
+
+	return nil
+}
+
+func (h *handle) SandboxSetupChild(user, dir string) error {
+	if h.ptr == 0 {
+		return dyerrors.ErrHandleNull
+	}
+
+	fn, err := h.registry.GetFunc("alpm_sandbox_setup_child")
+	if err != nil {
+		return err
+	}
+
+	cUser := lib.CString(user)
+	cDir := lib.CString(dir)
+
+	r1, _, _ := purego.SyscallN(fn, h.ptr, uintptr(unsafe.Pointer(&cUser[0])), uintptr(unsafe.Pointer(&cDir[0])))
+
+	runtime.KeepAlive(cUser)
+	runtime.KeepAlive(cDir)
+
+	if r1 != 0 {
+		return stderrors.New("failed to setup sandbox child")
+	}
+
+	return nil
+}

@@ -1,0 +1,26 @@
+name: Build Lint Test (BLT)
+on:
+  push:
+    branches-ignore:
+      - pacman*
+    paths-ignore:
+      - "example/**"
+      - "Dockerfile"
+      - "**/builder-image.yml"
+  pull_request:
+
+jobs:
+  build:
+    name: Build and test go-alpm
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/jguer/yay-builder:latest
+    env:
+      GOFLAGS: -buildvcs=false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Lint
+        run: /app/bin/golangci-lint run ./...
+      - name: Run Build and Tests
+        run: make test
