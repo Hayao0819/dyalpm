@@ -119,18 +119,6 @@ if len(conflicts) > 0 {
 }
 ```
 
-## Architecture
-
-The wrapper is structured as follows:
-
-- **`internal/lib`**: Core library loading and function registry with lazy loading
-- **`internal/list`**: ALPM list operations wrapper
-- **`internal/errors`**: Error types matching ALPM error codes
-- **`handle.go`**: Handle interface and implementation
-- **`database.go`**: Database interface and implementation
-- **`package.go`**: Package interface and implementation
-- **`transaction.go`**: Transaction interface and implementation
-
 ## Lazy Loading
 
 All C functions are loaded lazily - they are only resolved from the library when first needed. This improves startup time and allows the library to work even if some functions are unavailable.
@@ -144,7 +132,3 @@ if errno := handle.Errno(); errno != errors.ErrOK {
 	fmt.Printf("Error: %s\n", handle.StrError(errno))
 }
 ```
-
-## License
-
-This project is licensed under the same license as ALPM (GPL).
