@@ -1,4 +1,4 @@
-package alpm
+package dyalpm
 
 import "testing"
 
@@ -22,7 +22,7 @@ func TestVerCmp_Basic(t *testing.T) {
 		// Release comparisons
 		{"release difference", "1.0-1", "1.0-2", -1},
 		{"same version different release", "2.0-1", "2.0-3", -1},
-		{"release vs no release", "1.0-1", "1.0", 1},
+		{"release vs no release", "1.0-1", "1.0", 0}, // libalpm only compares releases when both exist
 	}
 
 	for _, tt := range tests {
@@ -66,6 +66,9 @@ func TestVerCmp_Alpha(t *testing.T) {
 	// Note: libalpm version comparison differs from semantic versioning.
 	// In libalpm, alphabetic suffixes are compared lexicographically and
 	// having additional content (like "alpha") makes a version "greater".
+	// Note: In libalpm, when a version segment is exhausted on one side
+	// but the other has remaining alpha characters, the empty one wins.
+	// This is because alpha suffixes are considered "pre-release" indicators.
 	tests := []struct {
 		name     string
 		v1       string
@@ -73,10 +76,10 @@ func TestVerCmp_Alpha(t *testing.T) {
 		expected int
 	}{
 		{"alpha vs beta", "1.0a", "1.0b", -1},
-		{"alpha suffix vs bare", "1.0alpha", "1.0", 1}, // alpha suffix > bare (more content)
+		{"alpha suffix vs bare", "1.0alpha", "1.0", -1}, // alpha suffix loses to bare
 		{"beta vs rc", "1.0beta", "1.0rc", -1},
 		{"same alpha", "1.0a", "1.0a", 0},
-		{"bare vs alpha suffix", "1.0", "1.0a", -1}, // bare < alpha suffix (less content)
+		{"bare vs alpha suffix", "1.0", "1.0a", 1}, // bare beats alpha suffix
 	}
 
 	for _, tt := range tests {
@@ -247,6 +250,12 @@ func TestSplitVersion(t *testing.T) {
 		{"1:1.0-1", "1", "1.0", "1"},
 		{"2:3.4.5-6", "2", "3.4.5", "6"},
 		{"1.0-1-2", "0", "1.0-1", "2"}, // Only last dash is release
+		// Epoch parsing edge cases (only digits before ':' count as epoch)
+		{"a:0", "0", "a:0", ""},            // 'a' is not a digit, so no epoch
+		{"1a:0", "0", "1a:0", ""},          // '1a' contains non-digit, so no epoch
+		{":1.0", "0", "1.0", ""},           // Empty epoch before ':' means "0"
+		{"0:1.0", "0", "1.0", ""},          // Explicit epoch "0"
+		{"12:3.4.5-6", "12", "3.4.5", "6"}, // Multi-digit epoch
 	}
 
 	for _, tt := range tests {

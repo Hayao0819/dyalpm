@@ -1,6 +1,6 @@
 //go:build integration
 
-package alpm_test
+package dyalpm_test
 
 import (
 	"testing"

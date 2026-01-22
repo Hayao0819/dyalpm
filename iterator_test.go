@@ -1,4 +1,4 @@
-package alpm
+package dyalpm
 
 import (
 	"errors"
