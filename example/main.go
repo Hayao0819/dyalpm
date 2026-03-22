@@ -43,7 +43,7 @@ func main() {
 	case "list-sync":
 		cmdErr = listSync(handle)
 	default:
-		log.Fatalf("Unknown command: %s", command)
+		cmdErr = fmt.Errorf("unknown command: %s", command)
 	}
 
 	if cmdErr != nil {

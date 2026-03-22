@@ -1,10 +1,10 @@
 package dyalpm
 
 import (
-	"unsafe"
+	stderrors "errors"
 
 	"github.com/Jguer/dyalpm/internal/lib"
-	"github.com/Jguer/dyalpm/internal/list"
+	alpmlist "github.com/Jguer/dyalpm/internal/list"
 )
 
 // TransactionFlag represents transaction flags
@@ -63,18 +63,26 @@ type Transaction interface {
 }
 
 type transaction struct {
-	handle   *handle
-	registry *lib.FunctionRegistry
+	handle *handle
 }
 
-func (t *transaction) getTransactionList(funcName string, failErr error) (*list.List, error) {
-	fn, err := t.registry.GetFunc(funcName)
-	if err != nil {
-		return nil, err
+func (t *transaction) getTransactionList(funcName string, failErr error) (*alpmlist.List, error) {
+	var fn func(uintptr, *uintptr) int32
+	switch funcName {
+	case "alpm_trans_prepare":
+		fn = lib.AlpmTransPrepare
+	case "alpm_trans_commit":
+		fn = lib.AlpmTransCommit
+	default:
+		return nil, stderrors.New("missing function: " + funcName)
+	}
+
+	if fn == nil {
+		return nil, stderrors.New("missing function: " + funcName)
 	}
 
 	var dataListPtr uintptr
-	result := lib.Syscall(fn, t.handle.ptr, uintptr(unsafe.Pointer(&dataListPtr)))
+	result := fn(t.handle.ptr, &dataListPtr)
 	if result != 0 {
 		return nil, failErr
 	}
@@ -83,7 +91,7 @@ func (t *transaction) getTransactionList(funcName string, failErr error) (*list.
 		return nil, nil
 	}
 
-	alpmList := list.NewList(dataListPtr)
+	alpmList := alpmlist.NewList(dataListPtr)
 	if alpmList == nil {
 		return nil, nil
 	}
@@ -94,10 +102,8 @@ func (t *transaction) getTransactionList(funcName string, failErr error) (*list.
 // NewTransaction creates a new transaction for the given handle
 func NewTransaction(h Handle) Transaction {
 	handle := h.(*handle)
-	reg, _ := lib.GetRegistry()
 	return &transaction{
-		handle:   handle,
-		registry: reg,
+		handle: handle,
 	}
 }
 
@@ -106,12 +112,11 @@ func (t *transaction) Init(flags TransactionFlag) error {
 		return ErrInvalidHandle
 	}
 
-	initFn, err := t.registry.GetFunc("alpm_trans_init")
-	if err != nil {
-		return err
+	if lib.AlpmTransInit == nil {
+		return stderrors.New("missing function: alpm_trans_init")
 	}
 
-	result := lib.Syscall(initFn, t.handle.ptr, uintptr(flags))
+	result := lib.AlpmTransInit(t.handle.ptr, clampIntToInt32(int(flags)))
 	if result != 0 {
 		return ErrTransactionInitFailed
 	}
@@ -128,6 +133,7 @@ func (t *transaction) Prepare() ([]DepMissing, error) {
 	if err != nil || alpmList == nil {
 		return []DepMissing{}, err
 	}
+	defer alpmList.Free()
 
 	missing := collectList(alpmList, func(ptr uintptr) DepMissing {
 		return newDepMissing(ptr)
@@ -145,6 +151,7 @@ func (t *transaction) Commit() ([]FileConflict, error) {
 	if err != nil || alpmList == nil {
 		return []FileConflict{}, err
 	}
+	defer alpmList.Free()
 
 	conflicts := collectList(alpmList, func(ptr uintptr) FileConflict {
 		return newFileConflict(ptr)
@@ -158,12 +165,11 @@ func (t *transaction) Release() error {
 		return ErrInvalidHandle
 	}
 
-	releaseFn, err := t.registry.GetFunc("alpm_trans_release")
-	if err != nil {
-		return err
+	if lib.AlpmTransRelease == nil {
+		return stderrors.New("missing function: alpm_trans_release")
 	}
 
-	result := lib.Syscall(releaseFn, t.handle.ptr)
+	result := lib.AlpmTransRelease(t.handle.ptr)
 	if result != 0 {
 		return ErrTransactionReleaseFailed
 	}
@@ -176,13 +182,12 @@ func (t *transaction) AddPkg(pkg Package) error {
 		return ErrInvalidHandle
 	}
 
-	addPkgFn, err := t.registry.GetFunc("alpm_add_pkg")
-	if err != nil {
-		return err
+	if lib.AlpmAddPkg == nil {
+		return stderrors.New("missing function: alpm_add_pkg")
 	}
 
 	pkgImpl := pkg.(*package_)
-	result := lib.Syscall(addPkgFn, t.handle.ptr, pkgImpl.ptr)
+	result := lib.AlpmAddPkg(t.handle.ptr, pkgImpl.ptr)
 	if result != 0 {
 		return ErrAddPackageFailed
 	}
@@ -195,13 +200,12 @@ func (t *transaction) RemovePkg(pkg Package) error {
 		return ErrInvalidHandle
 	}
 
-	removePkgFn, err := t.registry.GetFunc("alpm_remove_pkg")
-	if err != nil {
-		return err
+	if lib.AlpmRemovePkg == nil {
+		return stderrors.New("missing function: alpm_remove_pkg")
 	}
 
 	pkgImpl := pkg.(*package_)
-	result := lib.Syscall(removePkgFn, t.handle.ptr, pkgImpl.ptr)
+	result := lib.AlpmRemovePkg(t.handle.ptr, pkgImpl.ptr)
 	if result != 0 {
 		return ErrRemovePackageFailed
 	}
@@ -214,13 +218,15 @@ func (t *transaction) SyncSysupgrade(enableDowngrade bool) error {
 		return ErrInvalidHandle
 	}
 
-	sysupgradeFn, err := t.registry.GetFunc("alpm_sync_sysupgrade")
-	if err != nil {
-		return err
+	if lib.AlpmSyncSysupgrade == nil {
+		return stderrors.New("missing function: alpm_sync_sysupgrade")
 	}
 
-	downgradeInt := lib.BoolToInt(enableDowngrade)
-	result := lib.Syscall(sysupgradeFn, t.handle.ptr, downgradeInt)
+	downgrade := int32(0)
+	if enableDowngrade {
+		downgrade = 1
+	}
+	result := lib.AlpmSyncSysupgrade(t.handle.ptr, downgrade)
 	if result != 0 {
 		return ErrSysupgradeFailed
 	}
@@ -233,12 +239,11 @@ func (t *transaction) GetFlags() TransactionFlag {
 		return 0
 	}
 
-	getFlagsFn, err := t.registry.GetFunc("alpm_trans_get_flags")
-	if err != nil {
+	if lib.AlpmTransGetFlags == nil {
 		return 0
 	}
 
-	result := lib.Syscall(getFlagsFn, t.handle.ptr)
+	result := lib.AlpmTransGetFlags(t.handle.ptr)
 	return TransactionFlag(result)
 }
 
@@ -255,17 +260,28 @@ func (t *transaction) getPackageList(funcName string) ([]Package, error) {
 		return nil, ErrInvalidHandle
 	}
 
-	getFn, err := t.registry.GetFunc(funcName)
-	if err != nil {
-		return nil, err
+	switch funcName {
+	case "alpm_trans_get_add", "alpm_trans_get_remove":
+	default:
+		return nil, stderrors.New("missing function: " + funcName)
 	}
 
-	listPtr := lib.Syscall(getFn, t.handle.ptr)
+	var getFn func(uintptr) uintptr
+	if funcName == "alpm_trans_get_add" {
+		getFn = lib.AlpmTransGetAdd
+	} else {
+		getFn = lib.AlpmTransGetRemove
+	}
+	if getFn == nil {
+		return nil, stderrors.New("missing function: " + funcName)
+	}
+
+	listPtr := getFn(t.handle.ptr)
 	if listPtr == 0 {
 		return []Package{}, nil
 	}
 
-	alpmList := list.NewList(listPtr)
+	alpmList := alpmlist.NewList(listPtr)
 	if alpmList == nil {
 		return []Package{}, nil
 	}
