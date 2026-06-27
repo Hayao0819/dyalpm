@@ -91,6 +91,7 @@ func TestDepend_String_WithVersion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := tt.dep.String()
 			if result != tt.expected {
 				t.Errorf("Depend.String() = %q, want %q", result, tt.expected)
@@ -155,6 +156,7 @@ func TestDepend_String_ComplexVersions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := tt.dep.String()
 			if result != tt.expected {
 				t.Errorf("Depend.String() = %q, want %q", result, tt.expected)
@@ -219,14 +221,14 @@ func TestDependency_Interface(t *testing.T) {
 // Benchmark dependency string generation
 func BenchmarkDepend_String_Simple(b *testing.B) {
 	d := Depend{Name: "glibc", Version: "", Mod: DepModAny}
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = d.String()
 	}
 }
 
 func BenchmarkDepend_String_WithVersion(b *testing.B) {
 	d := Depend{Name: "glibc", Version: "2.38", Mod: DepModGE}
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = d.String()
 	}
 }

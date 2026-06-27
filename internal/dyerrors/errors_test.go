@@ -66,6 +66,7 @@ func TestErrno_Error(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.expected, func(t *testing.T) {
+			t.Parallel()
 			got := tt.errno.Error()
 			if got != tt.expected {
 				t.Errorf("Errno(%d).Error() = %q, want %q", tt.errno, got, tt.expected)
@@ -112,6 +113,7 @@ func TestNewError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := NewError(tt.errno, tt.msg)
 			if err == nil {
 				t.Fatal("NewError returned nil")
