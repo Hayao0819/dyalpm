@@ -125,10 +125,25 @@ All C functions are loaded lazily - they are only resolved from the library when
 
 ## Error Handling
 
-Errors are represented using the `errors.Errno` type which matches ALPM's error codes. You can check for specific errors:
+libalpm errors are exposed by `github.com/Jguer/dyalpm/errors`:
 
 ```go
-if errno := handle.Errno(); errno != errors.ErrOK {
+import (
+	stderrors "errors"
+
+	alpmerrors "github.com/Jguer/dyalpm/errors"
+)
+
+if errno := handle.Errno(); errno != alpmerrors.ErrOK {
 	fmt.Printf("Error: %s\n", handle.StrError(errno))
+}
+
+if stderrors.Is(err, alpmerrors.ErrPkgNotFound) {
+	fmt.Println("Package not found")
+}
+
+var alpmErr *alpmerrors.ALPMError
+if stderrors.As(err, &alpmErr) {
+	fmt.Printf("libalpm error %d: %s\n", alpmErr.Errno, alpmErr)
 }
 ```

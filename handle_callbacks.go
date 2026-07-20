@@ -8,7 +8,7 @@ import (
 
 	"github.com/ebitengine/purego"
 
-	alpmerrors "github.com/Jguer/dyalpm/internal/dyerrors"
+	alpmerrors "github.com/Jguer/dyalpm/errors"
 	"github.com/Jguer/dyalpm/internal/lib"
 )
 

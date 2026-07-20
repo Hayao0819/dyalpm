@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"unsafe"
 
-	"github.com/Jguer/dyalpm/internal/dyerrors"
+	alpmerrors "github.com/Jguer/dyalpm/errors"
 	"github.com/Jguer/dyalpm/internal/lib"
 	alpmlist "github.com/Jguer/dyalpm/internal/list"
 )
@@ -238,7 +238,7 @@ func (h *handle) SetDisableSandbox(disable bool) error {
 
 func (h *handle) AssumeInstalled() ([]Dependency, error) {
 	if h.ptr == 0 {
-		return nil, dyerrors.ErrHandleNull
+		return nil, alpmerrors.ErrHandleNull
 	}
 	if lib.AlpmOptionGetAssumeInstalled == nil {
 		return []Dependency{}, nil
@@ -271,7 +271,7 @@ func (h *handle) SetAssumeInstalled(deps []Dependency) error {
 
 func (h *handle) AddAssumeInstalled(dep Dependency) error {
 	if h.ptr == 0 {
-		return dyerrors.ErrHandleNull
+		return alpmerrors.ErrHandleNull
 	}
 	if lib.AlpmOptionAddAssumeInstalled == nil {
 		return errors.New("function unavailable: alpm_option_add_assumeinstalled")
@@ -284,7 +284,7 @@ func (h *handle) AddAssumeInstalled(dep Dependency) error {
 
 	r1 := lib.AlpmOptionAddAssumeInstalled(h.ptr, d.ptr)
 	if r1 != 0 {
-		return dyerrors.NewError(h.Errno(), "failed to add assume-installed dependency")
+		return alpmerrors.NewError(h.Errno(), "failed to add assume-installed dependency")
 	}
 
 	return nil
@@ -292,7 +292,7 @@ func (h *handle) AddAssumeInstalled(dep Dependency) error {
 
 func (h *handle) RemoveAssumeInstalled(dep Dependency) error {
 	if h.ptr == 0 {
-		return dyerrors.ErrHandleNull
+		return alpmerrors.ErrHandleNull
 	}
 	if lib.AlpmOptionRemoveAssumeInstalled == nil {
 		return errors.New("function unavailable: alpm_option_remove_assumeinstalled")
@@ -305,7 +305,7 @@ func (h *handle) RemoveAssumeInstalled(dep Dependency) error {
 
 	r1 := lib.AlpmOptionRemoveAssumeInstalled(h.ptr, d.ptr)
 	if r1 != 0 {
-		return dyerrors.NewError(h.Errno(), "failed to remove assume-installed dependency")
+		return alpmerrors.NewError(h.Errno(), "failed to remove assume-installed dependency")
 	}
 
 	return nil
@@ -331,7 +331,7 @@ func (h *handle) RemoveArchitecture(arch string) error {
 
 func (h *handle) matchOption(funcName, path string) (int, error) {
 	if h.ptr == 0 {
-		return 0, dyerrors.ErrHandleNull
+		return 0, alpmerrors.ErrHandleNull
 	}
 
 	switch funcName {
@@ -352,7 +352,7 @@ func (h *handle) matchOption(funcName, path string) (int, error) {
 
 func (h *handle) setOptionStr(funcName, value string) error {
 	if h.ptr == 0 {
-		return dyerrors.ErrHandleNull
+		return alpmerrors.ErrHandleNull
 	}
 
 	var result int32
@@ -462,7 +462,7 @@ func (h *handle) setOptionStr(funcName, value string) error {
 	}
 
 	if result != 0 {
-		return dyerrors.NewError(h.Errno(), "failed to set option")
+		return alpmerrors.NewError(h.Errno(), "failed to set option")
 	}
 	return nil
 }
@@ -509,7 +509,7 @@ func (h *handle) getOptionStr(funcName string) string {
 
 func (h *handle) setOptionInt(funcName string, value int) error {
 	if h.ptr == 0 {
-		return dyerrors.ErrHandleNull
+		return alpmerrors.ErrHandleNull
 	}
 
 	valueInt32 := clampIntToInt32(value)
@@ -561,7 +561,7 @@ func (h *handle) setOptionInt(funcName string, value int) error {
 	}
 
 	if result != 0 {
-		return dyerrors.NewError(h.Errno(), "failed to set option")
+		return alpmerrors.NewError(h.Errno(), "failed to set option")
 	}
 	return nil
 }
@@ -608,7 +608,7 @@ func (h *handle) getOptionInt(funcName string) int32 {
 
 func (h *handle) getOptionStrList(funcName string) ([]string, error) {
 	if h.ptr == 0 {
-		return nil, dyerrors.ErrHandleNull
+		return nil, alpmerrors.ErrHandleNull
 	}
 
 	var r1 uintptr
@@ -678,7 +678,7 @@ func (h *handle) getOptionStrList(funcName string) ([]string, error) {
 
 func (h *handle) setOptionStrList(funcName string, values []string) error {
 	if h.ptr == 0 {
-		return dyerrors.ErrHandleNull
+		return alpmerrors.ErrHandleNull
 	}
 	switch funcName {
 	case "alpm_option_set_cachedirs":
@@ -758,14 +758,14 @@ func (h *handle) setOptionStrList(funcName string, values []string) error {
 	runtime.KeepAlive(alpmList)
 
 	if r1 != 0 {
-		return dyerrors.NewError(h.Errno(), "failed to set option list")
+		return alpmerrors.NewError(h.Errno(), "failed to set option list")
 	}
 	return nil
 }
 
 func (h *handle) setOptionDepList(funcName string, deps []Dependency) error {
 	if h.ptr == 0 {
-		return dyerrors.ErrHandleNull
+		return alpmerrors.ErrHandleNull
 	}
 	switch funcName {
 	case "alpm_option_set_assumeinstalled":
@@ -796,7 +796,7 @@ func (h *handle) setOptionDepList(funcName string, deps []Dependency) error {
 	runtime.KeepAlive(alpmList)
 
 	if r1 != 0 {
-		return dyerrors.NewError(h.Errno(), "failed to set option dependency list")
+		return alpmerrors.NewError(h.Errno(), "failed to set option dependency list")
 	}
 	return nil
 }
