@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/Jguer/dyalpm/internal/lib"
+	"github.com/Hayao0819/dyalpm/internal/lib"
 )
 
 type foreignHandle struct {

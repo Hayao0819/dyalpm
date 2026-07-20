@@ -3,7 +3,7 @@ package alpmList
 import (
 	"unsafe"
 
-	"github.com/Jguer/dyalpm/internal/lib"
+	"github.com/Hayao0819/dyalpm/internal/lib"
 )
 
 // List represents an ALPM list node

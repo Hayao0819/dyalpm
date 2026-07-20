@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	alpm "github.com/Jguer/dyalpm"
+	alpm "github.com/Hayao0819/dyalpm"
 )
 
 func main() {

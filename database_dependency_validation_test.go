@@ -3,7 +3,7 @@ package dyalpm
 import (
 	"testing"
 
-	"github.com/Jguer/dyalpm/internal/lib"
+	"github.com/Hayao0819/dyalpm/internal/lib"
 )
 
 type foreignDatabase struct {

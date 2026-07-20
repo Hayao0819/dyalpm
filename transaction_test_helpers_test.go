@@ -4,9 +4,9 @@ import (
 	"testing"
 	"unsafe"
 
-	alpmerrors "github.com/Jguer/dyalpm/errors"
-	"github.com/Jguer/dyalpm/internal/lib"
-	"github.com/Jguer/dyalpm/internal/testutil/cmem"
+	alpmerrors "github.com/Hayao0819/dyalpm/errors"
+	"github.com/Hayao0819/dyalpm/internal/lib"
+	"github.com/Hayao0819/dyalpm/internal/testutil/cmem"
 )
 
 type transactionTestList struct {

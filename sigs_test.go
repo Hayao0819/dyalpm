@@ -4,7 +4,7 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/Jguer/dyalpm/internal/lib"
+	"github.com/Hayao0819/dyalpm/internal/lib"
 )
 
 func TestCheckPGPSignatureKeepsOutputPointer(t *testing.T) {

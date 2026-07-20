@@ -1,6 +1,6 @@
 package dyalpm
 
-import alpmerrors "github.com/Jguer/dyalpm/errors"
+import alpmerrors "github.com/Hayao0819/dyalpm/errors"
 
 type TransactionOperation string
 

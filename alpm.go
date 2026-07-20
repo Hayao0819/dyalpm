@@ -3,7 +3,7 @@ package dyalpm
 import (
 	stderrors "errors"
 
-	"github.com/Jguer/dyalpm/internal/lib"
+	"github.com/Hayao0819/dyalpm/internal/lib"
 )
 
 // Version returns the library version string

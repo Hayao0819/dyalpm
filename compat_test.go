@@ -8,7 +8,7 @@ import (
 
 	"github.com/ebitengine/purego"
 
-	"github.com/Jguer/dyalpm/internal/testutil/cmem"
+	"github.com/Hayao0819/dyalpm/internal/testutil/cmem"
 )
 
 type cListNode struct {

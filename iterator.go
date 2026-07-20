@@ -5,7 +5,7 @@ import (
 	"slices"
 	"sync"
 
-	alpmlist "github.com/Jguer/dyalpm/internal/list"
+	alpmlist "github.com/Hayao0819/dyalpm/internal/list"
 )
 
 // PackageIterator reuses borrowed lists and consumes owned lists once.

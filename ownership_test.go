@@ -3,8 +3,8 @@ package dyalpm
 import (
 	"testing"
 
-	"github.com/Jguer/dyalpm/internal/lib"
-	"github.com/Jguer/dyalpm/internal/testutil/cmem"
+	"github.com/Hayao0819/dyalpm/internal/lib"
+	"github.com/Hayao0819/dyalpm/internal/testutil/cmem"
 )
 
 func TestDependencyComputeStringCopiesAndFrees(t *testing.T) {

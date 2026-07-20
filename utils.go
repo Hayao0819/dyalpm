@@ -5,8 +5,8 @@ import (
 	"runtime"
 	"unsafe"
 
-	"github.com/Jguer/dyalpm/internal/lib"
-	alpmlist "github.com/Jguer/dyalpm/internal/list"
+	"github.com/Hayao0819/dyalpm/internal/lib"
+	alpmlist "github.com/Hayao0819/dyalpm/internal/list"
 )
 
 func collectList[T any](alpmList *alpmlist.List, build func(uintptr) T) []T {

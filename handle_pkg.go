@@ -3,8 +3,8 @@ package dyalpm
 import (
 	stderrors "errors"
 
-	alpmerrors "github.com/Jguer/dyalpm/errors"
-	"github.com/Jguer/dyalpm/internal/lib"
+	alpmerrors "github.com/Hayao0819/dyalpm/errors"
+	"github.com/Hayao0819/dyalpm/internal/lib"
 )
 
 func (h *handle) LoadPackage(filename string, full bool, siglevel int) (Package, error) {

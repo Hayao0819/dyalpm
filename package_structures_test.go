@@ -6,8 +6,8 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/Jguer/dyalpm/internal/lib"
-	"github.com/Jguer/dyalpm/internal/testutil/cmem"
+	"github.com/Hayao0819/dyalpm/internal/lib"
+	"github.com/Hayao0819/dyalpm/internal/testutil/cmem"
 )
 
 func TestSignatureResultDecoding(t *testing.T) {

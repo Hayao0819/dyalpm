@@ -1,4 +1,4 @@
-module github.com/Jguer/dyalpm
+module github.com/Hayao0819/dyalpm
 
 go 1.26
 

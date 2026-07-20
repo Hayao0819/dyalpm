@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	alpmerrors "github.com/Jguer/dyalpm/errors"
-	"github.com/Jguer/dyalpm/internal/lib"
+	alpmerrors "github.com/Hayao0819/dyalpm/errors"
+	"github.com/Hayao0819/dyalpm/internal/lib"
 )
 
 func TestTransactionPrepareDiagnostics(t *testing.T) {

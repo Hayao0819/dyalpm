@@ -3,7 +3,7 @@ package lib
 import (
 	"testing"
 
-	"github.com/Jguer/dyalpm/internal/testutil/cmem"
+	"github.com/Hayao0819/dyalpm/internal/testutil/cmem"
 )
 
 func TestPtrToStringCopiesSource(t *testing.T) {

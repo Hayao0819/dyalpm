@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	alpmerrors "github.com/Jguer/dyalpm/errors"
+	alpmerrors "github.com/Hayao0819/dyalpm/errors"
 )
 
 func TestErrnoValuesAndMessages(t *testing.T) {

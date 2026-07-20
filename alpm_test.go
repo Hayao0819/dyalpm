@@ -5,7 +5,7 @@ package dyalpm_test
 import (
 	"testing"
 
-	alpm "github.com/Jguer/dyalpm"
+	alpm "github.com/Hayao0819/dyalpm"
 )
 
 func TestInitializeAndRelease(t *testing.T) {

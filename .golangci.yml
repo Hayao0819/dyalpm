@@ -92,7 +92,7 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - github.com/Jguer/dyalpm
+        - github.com/Hayao0819/dyalpm
   exclusions:
     generated: lax
     paths:

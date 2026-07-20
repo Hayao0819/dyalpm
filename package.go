@@ -7,8 +7,8 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/Jguer/dyalpm/internal/lib"
-	alpmlist "github.com/Jguer/dyalpm/internal/list"
+	"github.com/Hayao0819/dyalpm/internal/lib"
+	alpmlist "github.com/Hayao0819/dyalpm/internal/list"
 )
 
 // Package represents an ALPM package (minimal surface used by yay).

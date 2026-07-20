@@ -3,8 +3,8 @@ package dyalpm
 import (
 	stderrors "errors"
 
-	"github.com/Jguer/dyalpm/internal/lib"
-	alpmlist "github.com/Jguer/dyalpm/internal/list"
+	"github.com/Hayao0819/dyalpm/internal/lib"
+	alpmlist "github.com/Hayao0819/dyalpm/internal/list"
 )
 
 func internalHandle(value Handle) (*handle, error) {

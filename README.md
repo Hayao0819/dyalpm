@@ -19,7 +19,7 @@ A Go wrapper for the Arch Linux Package Manager (ALPM) library using [purego](ht
 ## Installation
 
 ```bash
-go get github.com/Jguer/dyalpm
+go get github.com/Hayao0819/dyalpm
 ```
 
 ## Usage
@@ -33,7 +33,7 @@ import (
 	"fmt"
 	"log"
 
-	alpm "github.com/Jguer/dyalpm"
+	alpm "github.com/Hayao0819/dyalpm"
 )
 
 func main() {
@@ -137,13 +137,13 @@ next operation.
 
 ## Error Handling
 
-libalpm errors are exposed by `github.com/Jguer/dyalpm/errors`:
+libalpm errors are exposed by `github.com/Hayao0819/dyalpm/errors`:
 
 ```go
 import (
 	stderrors "errors"
 
-	alpmerrors "github.com/Jguer/dyalpm/errors"
+	alpmerrors "github.com/Hayao0819/dyalpm/errors"
 )
 
 if errno := handle.Errno(); errno != alpmerrors.ErrOK {

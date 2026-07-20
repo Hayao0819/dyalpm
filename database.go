@@ -5,8 +5,8 @@ import (
 	"runtime"
 	"unsafe"
 
-	"github.com/Jguer/dyalpm/internal/lib"
-	alpmlist "github.com/Jguer/dyalpm/internal/list"
+	"github.com/Hayao0819/dyalpm/internal/lib"
+	alpmlist "github.com/Hayao0819/dyalpm/internal/list"
 )
 
 // Usage type for database usage flags
