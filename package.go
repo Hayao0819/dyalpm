@@ -3,6 +3,7 @@ package dyalpm
 import (
 	stderrors "errors"
 	"io"
+	"strings"
 	"time"
 	"unsafe"
 
@@ -154,6 +155,10 @@ func (p *package_) getDependencyList(funcName string) ([]Dependency, error) {
 	switch funcName {
 	case "alpm_pkg_get_depends":
 		getFn = lib.AlpmPkgGetDepends
+	case "alpm_pkg_get_checkdepends":
+		getFn = lib.AlpmPkgGetCheckdepends
+	case "alpm_pkg_get_makedepends":
+		getFn = lib.AlpmPkgGetMakedepends
 	case "alpm_pkg_get_conflicts":
 		getFn = lib.AlpmPkgGetConflicts
 	case "alpm_pkg_get_provides":
@@ -279,8 +284,6 @@ func (p *package_) getStringListWithFree(funcName string, freeList bool) ([]stri
 		getter = lib.AlpmPkgGetGroups
 	case "alpm_pkg_get_licenses":
 		getter = lib.AlpmPkgGetLicenses
-	case "alpm_pkg_get_xdata":
-		getter = lib.AlpmPkgGetXdata
 	case "alpm_pkg_compute_requiredby":
 		getter = lib.AlpmPkgComputeRequiredBy
 	case "alpm_pkg_compute_optionalfor":
@@ -686,13 +689,55 @@ func (p *package_) PkgValidation() PkgValidation {
 	return PkgValidation(result)
 }
 
-func (p *package_) XData() []string {
+type PackageXData struct {
+	Name  string
+	Value string
+}
+
+type PackageXDataProvider interface {
+	XDataValues() []PackageXData
+}
+
+type alpmPackageXData struct {
+	Name  uintptr
+	Value uintptr
+}
+
+func (p *package_) XDataValues() []PackageXData {
 	if p.ptr == 0 {
 		return nil
 	}
 
-	// alpm_pkg_get_xdata returns a list owned by the package
-	result, _ := p.getStringList("alpm_pkg_get_xdata")
+	if lib.AlpmPkgGetXdata == nil {
+		return nil
+	}
+
+	list := alpmlist.NewList(lib.AlpmPkgGetXdata(p.ptr))
+	if list == nil {
+		return []PackageXData{}
+	}
+
+	values := make([]PackageXData, 0)
+	for item := list; item != nil && item.Ptr() != 0; item = item.Next() {
+		ptr := item.Data()
+		if ptr == 0 {
+			continue
+		}
+		data := (*alpmPackageXData)(unsafe.Pointer(ptr))
+		values = append(values, PackageXData{
+			Name:  strings.Clone(lib.PtrToString(data.Name)),
+			Value: strings.Clone(lib.PtrToString(data.Value)),
+		})
+	}
+	return values
+}
+
+func (p *package_) XData() []string {
+	values := p.XDataValues()
+	result := make([]string, len(values))
+	for i, value := range values {
+		result[i] = value.Name + "=" + value.Value
+	}
 	return result
 }
 
