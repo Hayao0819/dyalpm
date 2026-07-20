@@ -273,13 +273,14 @@ func (h *handle) AddAssumeInstalled(dep Dependency) error {
 	if h.ptr == 0 {
 		return dyerrors.ErrHandleNull
 	}
-	if lib.AlpmOptionAddAssumeInstalled == nil {
-		return errors.New("function unavailable: alpm_option_add_assumeinstalled")
+
+	d, err := internalDependency(dep)
+	if err != nil {
+		return err
 	}
 
-	d, ok := dep.(*dependency)
-	if !ok {
-		return ErrInvalidPackage
+	if lib.AlpmOptionAddAssumeInstalled == nil {
+		return errors.New("function unavailable: alpm_option_add_assumeinstalled")
 	}
 
 	r1 := lib.AlpmOptionAddAssumeInstalled(h.ptr, d.ptr)
@@ -294,13 +295,14 @@ func (h *handle) RemoveAssumeInstalled(dep Dependency) error {
 	if h.ptr == 0 {
 		return dyerrors.ErrHandleNull
 	}
-	if lib.AlpmOptionRemoveAssumeInstalled == nil {
-		return errors.New("function unavailable: alpm_option_remove_assumeinstalled")
+
+	d, err := internalDependency(dep)
+	if err != nil {
+		return err
 	}
 
-	d, ok := dep.(*dependency)
-	if !ok {
-		return ErrInvalidPackage
+	if lib.AlpmOptionRemoveAssumeInstalled == nil {
+		return errors.New("function unavailable: alpm_option_remove_assumeinstalled")
 	}
 
 	r1 := lib.AlpmOptionRemoveAssumeInstalled(h.ptr, d.ptr)
@@ -767,6 +769,13 @@ func (h *handle) setOptionDepList(funcName string, deps []Dependency) error {
 	if h.ptr == 0 {
 		return dyerrors.ErrHandleNull
 	}
+
+	alpmList, err := dependencyList(deps)
+	if err != nil {
+		return err
+	}
+	defer alpmList.Free()
+
 	switch funcName {
 	case "alpm_option_set_assumeinstalled":
 		if lib.AlpmOptionSetNoassumeInstalled == nil {
@@ -774,17 +783,6 @@ func (h *handle) setOptionDepList(funcName string, deps []Dependency) error {
 		}
 	default:
 		return errors.New("unsupported function: " + funcName)
-	}
-
-	var alpmList *alpmlist.List
-	for _, d := range deps {
-		depImpl, ok := d.(*dependency)
-		if ok {
-			alpmList = alpmlist.Add(alpmList, depImpl.ptr)
-		}
-	}
-	if alpmList != nil {
-		defer alpmList.Free()
 	}
 
 	var listPtr uintptr

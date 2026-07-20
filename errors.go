@@ -21,4 +21,5 @@ var (
 	ErrPackageFreeFailed        = errors.New("package free failed")
 	ErrPackageLoadFailed        = errors.New("package load failed")
 	ErrInvalidDependency        = errors.New("invalid dependency")
+	ErrListCreationFailed       = errors.New("list creation failed")
 )
