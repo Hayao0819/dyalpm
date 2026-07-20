@@ -3,35 +3,61 @@ package dyalpm
 import (
 	"cmp"
 	"slices"
+	"sync"
 
 	alpmlist "github.com/Jguer/dyalpm/internal/list"
 )
 
-// PackageIterator provides lazy iteration over an ALPM package list.
+// PackageIterator reuses borrowed lists and consumes owned lists once.
 type PackageIterator struct {
-	list       *alpmlist.List
-	handle     *handle
-	freeOnDone bool
+	state  *packageIteratorState
+	handle *handle
 }
 
-func newPackageIterator(listPtr uintptr, h *handle, freeOnDone bool) PackageIterator {
+type packageIteratorState struct {
+	mu    sync.Mutex
+	list  *alpmlist.List
+	owned bool
+}
+
+func newPackageIterator(listPtr uintptr, h *handle, owned bool) PackageIterator {
+	list := alpmlist.NewList(listPtr)
+	if list == nil {
+		return PackageIterator{handle: h}
+	}
 	return PackageIterator{
-		list:       alpmlist.NewList(listPtr),
-		handle:     h,
-		freeOnDone: freeOnDone,
+		state:  &packageIteratorState{list: list, owned: owned},
+		handle: h,
 	}
 }
 
-// ForEach iterates over packages lazily. If the underlying list must be freed,
-// it will be freed after iteration.
+func (s *packageIteratorState) acquire() (*alpmlist.List, bool) {
+	if s == nil {
+		return nil, false
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	list := s.list
+	if list == nil {
+		return nil, false
+	}
+	if s.owned {
+		s.list = nil
+	}
+	return list, s.owned
+}
+
 func (it PackageIterator) ForEach(fn func(Package) error) error {
-	if it.list == nil {
+	list, release := it.state.acquire()
+	if list == nil {
 		return nil
 	}
-	if it.freeOnDone {
-		defer it.list.Free()
+	if release {
+		defer list.Free()
 	}
-	for item := it.list; item != nil && item.Ptr() != 0; item = item.Next() {
+	for item := list; item != nil && item.Ptr() != 0; item = item.Next() {
 		pkgPtr := item.Data()
 		if pkgPtr == 0 {
 			continue
