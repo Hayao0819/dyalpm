@@ -117,10 +117,8 @@ func (d *dependency) ComputeString() string {
 		return ""
 	}
 
-	// The string returned by alpm_dep_compute_string MUST be freed by the caller.
-	res := lib.PtrToString(r1)
-	lib.Free(r1)
-	return res
+	defer lib.Free(r1)
+	return lib.PtrToString(r1)
 }
 
 func (d *dependency) Free() {
@@ -136,6 +134,9 @@ func (d *dependency) Free() {
 
 // DepFromString creates a dependency from a string
 func DepFromString(depstring string) (Dependency, error) {
+	if err := lib.EnsureAlpmLoaded(); err != nil {
+		return nil, err
+	}
 	if lib.AlpmDepFromString == nil {
 		return nil, stderrors.New("missing function: alpm_dep_from_string")
 	}

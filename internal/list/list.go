@@ -133,7 +133,22 @@ func (l *List) Free() {
 	}
 	if lib.AlpmListFree != nil {
 		lib.AlpmListFree(l.ptr)
+		l.ptr = 0
 	}
+}
+
+func (l *List) FreeWith(freeData func(uintptr)) {
+	if l == nil || l.ptr == 0 {
+		return
+	}
+	if freeData != nil {
+		for item := l; item != nil && item.ptr != 0; item = item.Next() {
+			if data := item.Data(); data != 0 {
+				freeData(data)
+			}
+		}
+	}
+	l.Free()
 }
 
 // Add adds data to the list and returns the new list head

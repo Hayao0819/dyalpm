@@ -1,8 +1,11 @@
 package alpmList
 
 import (
+	"runtime"
 	"testing"
 	"unsafe"
+
+	"github.com/Jguer/dyalpm/internal/lib"
 )
 
 // alpmListNode represents the C struct alpm_list_t layout for testing
@@ -300,5 +303,36 @@ func TestList_ZeroPtr_Prev(t *testing.T) {
 	prev := l.Prev()
 	if prev != nil {
 		t.Error("zero ptr Prev() should be nil")
+	}
+}
+
+func TestList_FreeWith(t *testing.T) {
+	l, nodes := createTestList([]uintptr{10, 0, 30})
+	head := l.Ptr()
+
+	originalListFree := lib.AlpmListFree
+	t.Cleanup(func() {
+		lib.AlpmListFree = originalListFree
+	})
+
+	var freedList uintptr
+	lib.AlpmListFree = func(ptr uintptr) {
+		freedList = ptr
+	}
+
+	var freedData []uintptr
+	l.FreeWith(func(ptr uintptr) {
+		freedData = append(freedData, ptr)
+	})
+	runtime.KeepAlive(nodes)
+
+	if len(freedData) != 2 || freedData[0] != 10 || freedData[1] != 30 {
+		t.Fatalf("freed data = %v, want [10 30]", freedData)
+	}
+	if freedList != head {
+		t.Fatalf("freed list = %#x, want %#x", freedList, head)
+	}
+	if l.Ptr() != 0 {
+		t.Fatalf("list pointer = %#x after FreeWith(), want 0", l.Ptr())
 	}
 }

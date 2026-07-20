@@ -17,18 +17,11 @@ func CString(s string) []byte {
 	return buf
 }
 
-// PtrToString converts a C string pointer to a Go string
-// This function finds the null terminator to determine the length
 func PtrToString(ptr uintptr) string {
 	if ptr == 0 {
 		return ""
 	}
 	base := unsafe.Pointer(ptr)
-	start := (*byte)(base)
-	if start == nil {
-		return ""
-	}
-	// Find null terminator
 	n := 0
 	for *(*byte)(unsafe.Add(base, n)) != 0 {
 		n++
@@ -39,16 +32,15 @@ func PtrToString(ptr uintptr) string {
 	if n == 0 {
 		return ""
 	}
-	return unsafe.String(start, n)
+	return string(unsafe.Slice((*byte)(base), n))
 }
 
-// PtrToStringWithLen converts a C string pointer with known length to Go string
 func PtrToStringWithLen(ptr uintptr, length int) string {
-	if ptr == 0 || length == 0 {
+	if ptr == 0 || length <= 0 {
 		return ""
 	}
 	base := unsafe.Pointer(ptr)
-	return unsafe.String((*byte)(base), length)
+	return string(unsafe.Slice((*byte)(base), length))
 }
 
 // BoolToInt converts a Go bool to C int (0 or 1)

@@ -190,7 +190,7 @@ var (
 	AlpmPkgGetBase64Sig       func(pkg uintptr) uintptr
 	AlpmPkgChangelogOpen      func(pkg uintptr) uintptr
 	AlpmPkgChangelogRead      func(buf uintptr, size uintptr, pkg uintptr, fp uintptr) int
-	AlpmPkgChangelogClose     func(pkg uintptr, fp uintptr)
+	AlpmPkgChangelogClose     func(pkg uintptr, fp uintptr) int32
 	AlpmPkgSyncGetNewVersion  func(pkg uintptr, dbList uintptr) uintptr
 	AlpmPkgGetFilesContains   func(fileList uintptr, path string) int32
 	AlpmPkgFree               func(pkg uintptr) int32
