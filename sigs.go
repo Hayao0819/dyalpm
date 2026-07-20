@@ -2,6 +2,7 @@ package dyalpm
 
 import (
 	stderrors "errors"
+	"strings"
 	"unsafe"
 
 	"github.com/Jguer/dyalpm/internal/lib"
@@ -12,11 +13,13 @@ type SigStatus int
 
 const (
 	SigStatusValid SigStatus = iota
-	SigStatusInvalid
-	SigStatusSigExpired
 	SigStatusKeyExpired
+	SigStatusSigExpired
 	SigStatusKeyUnknown
 	SigStatusKeyDisabled
+	SigStatusInvalid
+
+	// Deprecated: libalpm does not report a distinct revoked-key status.
 	SigStatusKeyRevoked
 )
 
@@ -42,17 +45,27 @@ type SigList struct {
 	Results []SigResult
 }
 
-// Internal structure for alpm_siglist_t
-type alpmSiglistT struct {
+type alpmSigList struct {
 	Count   uintptr
 	Results uintptr
 }
 
-// Internal structure for alpm_sigresult_t
-type alpmSigresultT struct {
-	KeyID    uintptr
-	Status   int
-	Validity int
+type alpmPGPKey struct {
+	Data        uintptr
+	Fingerprint uintptr
+	UID         uintptr
+	Name        uintptr
+	Email       uintptr
+	Created     int64
+	Expires     int64
+	Length      uint32
+	Revoked     uint32
+}
+
+type alpmSigResult struct {
+	Key      alpmPGPKey
+	Status   int32
+	Validity int32
 }
 
 func decodeSigList(ptr uintptr) SigList {
@@ -61,20 +74,20 @@ func decodeSigList(ptr uintptr) SigList {
 	}
 
 	base := unsafe.Pointer(ptr)
-	sigList := (*alpmSiglistT)(base)
+	sigList := (*alpmSigList)(base)
 	if sigList.Count == 0 || sigList.Results == 0 {
 		return SigList{}
 	}
 
 	var results []SigResult
-	resultSize := unsafe.Sizeof(alpmSigresultT{})
+	resultSize := unsafe.Sizeof(alpmSigResult{})
 	resultsBase := unsafe.Pointer(sigList.Results)
 
 	for i := uintptr(0); i < sigList.Count; i++ {
-		res := (*alpmSigresultT)(unsafe.Add(resultsBase, i*resultSize))
+		res := (*alpmSigResult)(unsafe.Add(resultsBase, i*resultSize))
 
 		results = append(results, SigResult{
-			KeyID:    lib.PtrToString(res.KeyID),
+			KeyID:    strings.Clone(lib.PtrToString(res.Key.Fingerprint)),
 			Status:   SigStatus(res.Status),
 			Validity: SigValidity(res.Validity),
 		})
@@ -98,7 +111,7 @@ func checkPGPSignature(ptr uintptr, handle *handle, funcName string) (SigList, e
 		return SigList{}, stderrors.New("missing function: " + funcName)
 	}
 
-	var sigList alpmSiglistT
+	var sigList alpmSigList
 	sigListPtr := uintptr(unsafe.Pointer(&sigList))
 
 	result := fn(ptr, sigListPtr)

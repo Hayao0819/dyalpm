@@ -49,7 +49,12 @@ func TestPackage_MetadataAndFileAccess(t *testing.T) {
 		t.Fatalf("expected package %q to expose provides", pkg.Name())
 	}
 	_ = pkg.OptionalDepends()
-	_ = pkgImpl.XData()
+	xdata := pkgImpl.XDataValues()
+	for _, value := range xdata {
+		if value.Name == "" {
+			t.Fatalf("package %q returned xdata without a name: %#v", pkg.Name(), value)
+		}
+	}
 	_ = pkgImpl.Base()
 
 	files := pkgImpl.Files()
@@ -182,6 +187,40 @@ func TestPackage_MoreValueMethods(t *testing.T) {
 		t.Logf("Sig() returned no bytes for %s", pkg.Name())
 	}
 
+}
+
+func TestPackage_SyncBuildDependencies(t *testing.T) {
+	h := mustInitializeTestHandle(t)
+	found := false
+
+	for _, repoName := range []string{"core", "extra"} {
+		db, err := h.RegisterSyncDB(repoName, 0)
+		if err != nil {
+			continue
+		}
+
+		for _, pkg := range db.PkgCache().Collect() {
+			impl, ok := pkg.(*package_)
+			if !ok {
+				continue
+			}
+
+			dependencies := append(impl.CheckDepends(), impl.MakeDepends()...)
+			if len(dependencies) == 0 {
+				continue
+			}
+			found = true
+			for _, dependency := range dependencies {
+				if dependency.Name == "" {
+					t.Fatalf("%s/%s returned an unnamed build dependency", repoName, pkg.Name())
+				}
+			}
+		}
+	}
+
+	if !found {
+		t.Skip("no sync package build dependencies available")
+	}
 }
 
 func TestPackage_NilPointerSafety(t *testing.T) {

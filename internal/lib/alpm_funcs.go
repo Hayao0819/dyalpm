@@ -163,6 +163,8 @@ var (
 	AlpmPkgGetISize           func(pkg uintptr) int64
 	AlpmPkgGetDB              func(pkg uintptr) uintptr
 	AlpmPkgGetDepends         func(pkg uintptr) uintptr
+	AlpmPkgGetCheckdepends    func(pkg uintptr) uintptr
+	AlpmPkgGetMakedepends     func(pkg uintptr) uintptr
 	AlpmPkgGetConflicts       func(pkg uintptr) uintptr
 	AlpmPkgGetProvides        func(pkg uintptr) uintptr
 	AlpmPkgGetOptdepends      func(pkg uintptr) uintptr
@@ -371,6 +373,8 @@ func registerAlpmFuncs(library uintptr) {
 	tryRegister(&AlpmPkgGetISize, library, "alpm_pkg_get_isize")
 	tryRegister(&AlpmPkgGetDB, library, "alpm_pkg_get_db")
 	tryRegister(&AlpmPkgGetDepends, library, "alpm_pkg_get_depends")
+	tryRegister(&AlpmPkgGetCheckdepends, library, "alpm_pkg_get_checkdepends")
+	tryRegister(&AlpmPkgGetMakedepends, library, "alpm_pkg_get_makedepends")
 	tryRegister(&AlpmPkgGetConflicts, library, "alpm_pkg_get_conflicts")
 	tryRegister(&AlpmPkgGetProvides, library, "alpm_pkg_get_provides")
 	tryRegister(&AlpmPkgGetOptdepends, library, "alpm_pkg_get_optdepends")

@@ -30,6 +30,11 @@ type Dependency interface {
 	Free()
 }
 
+type DependencyMetadata interface {
+	GetDescription() string
+	GetNameHash() uint64
+}
+
 // Depend is a value type representation of a dependency for consumer code.
 type Depend struct {
 	Name        string
@@ -65,6 +70,15 @@ type dependency struct {
 	owned bool
 }
 
+// unsigned long is pointer-sized in the Linux alpm_depend_t ABI.
+type alpmDepend struct {
+	Name        uintptr
+	Version     uintptr
+	Description uintptr
+	NameHash    uintptr
+	Mod         int32
+}
+
 func newDependency(ptr uintptr) *dependency {
 	return &dependency{
 		ptr:   ptr,
@@ -72,36 +86,51 @@ func newDependency(ptr uintptr) *dependency {
 	}
 }
 
+func (d *dependency) data() *alpmDepend {
+	if d == nil || d.ptr == 0 {
+		return nil
+	}
+	return (*alpmDepend)(unsafe.Pointer(d.ptr))
+}
+
 func (d *dependency) GetName() string {
-	if d.ptr == 0 {
+	data := d.data()
+	if data == nil {
 		return ""
 	}
-	// alpm_depend_t structure: char *name at offset 0
-	base := unsafe.Pointer(d.ptr)
-	namePtr := *(*uintptr)(base)
-	return lib.PtrToString(namePtr)
+	return lib.PtrToString(data.Name)
 }
 
 func (d *dependency) GetVersion() string {
-	if d.ptr == 0 {
+	data := d.data()
+	if data == nil {
 		return ""
 	}
-	// alpm_depend_t structure: char *version at offset of pointer size
-	base := unsafe.Pointer(d.ptr)
-	versionPtr := *(*uintptr)(unsafe.Add(base, unsafe.Sizeof(uintptr(0))))
-	return lib.PtrToString(versionPtr)
+	return lib.PtrToString(data.Version)
+}
+
+func (d *dependency) GetDescription() string {
+	data := d.data()
+	if data == nil {
+		return ""
+	}
+	return lib.PtrToString(data.Description)
+}
+
+func (d *dependency) GetNameHash() uint64 {
+	data := d.data()
+	if data == nil {
+		return 0
+	}
+	return uint64(data.NameHash)
 }
 
 func (d *dependency) GetMod() DepMod {
-	if d.ptr == 0 {
+	data := d.data()
+	if data == nil {
 		return DepModAny
 	}
-	// alpm_depend_t structure: alpm_depmod_t mod is after name_hash (unsigned long)
-	// Offset: name (ptr) + version (ptr) + desc (ptr) + name_hash (ulong) = 3*ptr + ulong
-	modOffset := 3*unsafe.Sizeof(uintptr(0)) + unsafe.Sizeof(uint64(0))
-	base := unsafe.Pointer(d.ptr)
-	mod := *(*int)(unsafe.Add(base, modOffset))
-	return DepMod(mod)
+	return DepMod(data.Mod)
 }
 
 func (d *dependency) ComputeString() string {
@@ -163,38 +192,47 @@ type depMissing struct {
 	ptr uintptr
 }
 
+type alpmDepMissing struct {
+	Target     uintptr
+	Depend     uintptr
+	CausingPkg uintptr
+}
+
 func newDepMissing(ptr uintptr) *depMissing {
 	return &depMissing{
 		ptr: ptr,
 	}
 }
 
+func (d *depMissing) data() *alpmDepMissing {
+	if d == nil || d.ptr == 0 {
+		return nil
+	}
+	return (*alpmDepMissing)(unsafe.Pointer(d.ptr))
+}
+
 func (d *depMissing) GetTarget() string {
-	if d.ptr == 0 {
+	data := d.data()
+	if data == nil {
 		return ""
 	}
-	// struct _alpm_depmissing_t { char *target; alpm_depend_t *depend; char *causingpkg; }
-	base := unsafe.Pointer(d.ptr)
-	targetPtr := *(*uintptr)(base)
-	return lib.PtrToString(targetPtr)
+	return lib.PtrToString(data.Target)
 }
 
 func (d *depMissing) GetDepend() Dependency {
-	if d.ptr == 0 {
+	data := d.data()
+	if data == nil || data.Depend == 0 {
 		return nil
 	}
-	base := unsafe.Pointer(d.ptr)
-	depPtr := *(*uintptr)(unsafe.Add(base, unsafe.Sizeof(uintptr(0))))
-	return newDependency(depPtr)
+	return newDependency(data.Depend)
 }
 
 func (d *depMissing) GetCausingPkg() string {
-	if d.ptr == 0 {
+	data := d.data()
+	if data == nil {
 		return ""
 	}
-	base := unsafe.Pointer(d.ptr)
-	pkgPtr := *(*uintptr)(unsafe.Add(base, 2*unsafe.Sizeof(uintptr(0))))
-	return lib.PtrToString(pkgPtr)
+	return lib.PtrToString(data.CausingPkg)
 }
 
 func (d *depMissing) Free() {
@@ -220,41 +258,56 @@ type conflict struct {
 	ptr uintptr
 }
 
+type alpmConflict struct {
+	Package1 uintptr
+	Package2 uintptr
+	Reason   uintptr
+}
+
 func newConflict(ptr uintptr) *conflict {
 	return &conflict{
 		ptr: ptr,
 	}
 }
 
-func (c *conflict) GetPackage1() string {
-	if c.ptr == 0 {
+func (c *conflict) data() *alpmConflict {
+	if c == nil || c.ptr == 0 {
+		return nil
+	}
+	return (*alpmConflict)(unsafe.Pointer(c.ptr))
+}
+
+func conflictPackageName(ptr uintptr) string {
+	if ptr == 0 || lib.AlpmPkgGetName == nil {
 		return ""
 	}
-	// struct _alpm_conflict_t { ulong hash1; ulong hash2; char *pkg1; char *pkg2; alpm_depend_t *reason; }
-	base := unsafe.Pointer(c.ptr)
-	pkg1Ptr := *(*uintptr)(unsafe.Add(base, 2*unsafe.Sizeof(uintptr(0))))
-	return lib.PtrToString(pkg1Ptr)
+	return lib.PtrToString(lib.AlpmPkgGetName(ptr))
+}
+
+func (c *conflict) GetPackage1() string {
+	data := c.data()
+	if data == nil {
+		return ""
+	}
+	return conflictPackageName(data.Package1)
 }
 
 func (c *conflict) GetPackage2() string {
-	if c.ptr == 0 {
+	data := c.data()
+	if data == nil {
 		return ""
 	}
-	base := unsafe.Pointer(c.ptr)
-	pkg2Ptr := *(*uintptr)(unsafe.Add(base, 3*unsafe.Sizeof(uintptr(0))))
-	return lib.PtrToString(pkg2Ptr)
+	return conflictPackageName(data.Package2)
 }
 
 func (c *conflict) GetReason() Dependency {
-	if c.ptr == 0 {
+	data := c.data()
+	if data == nil || data.Reason == 0 {
 		return nil
 	}
-	base := unsafe.Pointer(c.ptr)
-	reasonPtr := *(*uintptr)(unsafe.Add(base, 4*unsafe.Sizeof(uintptr(0))))
-	return newDependency(reasonPtr)
+	return newDependency(data.Reason)
 }
 
-// toDependList converts a Dependency slice into a Depend slice.
 func toDependList(deps []Dependency) []Depend {
 	result := make([]Depend, len(deps))
 	for i, dep := range deps {
@@ -262,6 +315,10 @@ func toDependList(deps []Dependency) []Depend {
 			Name:    dep.GetName(),
 			Version: dep.GetVersion(),
 			Mod:     dep.GetMod(),
+		}
+		if metadata, ok := dep.(DependencyMetadata); ok {
+			result[i].Description = metadata.GetDescription()
+			result[i].NameHash = metadata.GetNameHash()
 		}
 	}
 	return result
@@ -299,47 +356,56 @@ type fileConflict struct {
 	ptr uintptr
 }
 
+type alpmFileConflict struct {
+	Target  uintptr
+	Type    int32
+	File    uintptr
+	CTarget uintptr
+}
+
 func newFileConflict(ptr uintptr) *fileConflict {
 	return &fileConflict{
 		ptr: ptr,
 	}
 }
 
+func (f *fileConflict) data() *alpmFileConflict {
+	if f == nil || f.ptr == 0 {
+		return nil
+	}
+	return (*alpmFileConflict)(unsafe.Pointer(f.ptr))
+}
+
 func (f *fileConflict) GetTarget() string {
-	if f.ptr == 0 {
+	data := f.data()
+	if data == nil {
 		return ""
 	}
-	// struct _alpm_fileconflict_t { char *target; type; char *file; char *ctarget; }
-	base := unsafe.Pointer(f.ptr)
-	targetPtr := *(*uintptr)(base)
-	return lib.PtrToString(targetPtr)
+	return lib.PtrToString(data.Target)
 }
 
 func (f *fileConflict) GetType() FileConflictType {
-	if f.ptr == 0 {
+	data := f.data()
+	if data == nil {
 		return 0
 	}
-	base := unsafe.Pointer(f.ptr)
-	typeVal := *(*int)(unsafe.Add(base, unsafe.Sizeof(uintptr(0))))
-	return FileConflictType(typeVal)
+	return FileConflictType(data.Type)
 }
 
 func (f *fileConflict) GetFile() string {
-	if f.ptr == 0 {
+	data := f.data()
+	if data == nil {
 		return ""
 	}
-	base := unsafe.Pointer(f.ptr)
-	filePtr := *(*uintptr)(unsafe.Add(base, 2*unsafe.Sizeof(uintptr(0))))
-	return lib.PtrToString(filePtr)
+	return lib.PtrToString(data.File)
 }
 
 func (f *fileConflict) GetCTarget() string {
-	if f.ptr == 0 {
+	data := f.data()
+	if data == nil {
 		return ""
 	}
-	base := unsafe.Pointer(f.ptr)
-	ctargetPtr := *(*uintptr)(unsafe.Add(base, 3*unsafe.Sizeof(uintptr(0))))
-	return lib.PtrToString(ctargetPtr)
+	return lib.PtrToString(data.CTarget)
 }
 
 func (f *fileConflict) Free() {

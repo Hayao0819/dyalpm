@@ -57,6 +57,12 @@ func TestAlpmFuncResolution(t *testing.T) {
 	if AlpmPkgCheckPGPSignature == nil {
 		t.Error("expected alpm_pkg_check_pgp_signature to resolve")
 	}
+	if AlpmPkgGetCheckdepends == nil {
+		t.Error("expected alpm_pkg_get_checkdepends to resolve")
+	}
+	if AlpmPkgGetMakedepends == nil {
+		t.Error("expected alpm_pkg_get_makedepends to resolve")
+	}
 	if LibcFree == nil {
 		t.Error("expected libc free to resolve")
 	}
