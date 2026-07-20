@@ -4,15 +4,16 @@ A Go wrapper for the Arch Linux Package Manager (ALPM) library using [purego](ht
 
 ## Features
 
-- **Lazy Loading**: Functions are loaded and registered only when needed
-- **Type-Safe Interfaces**: Clean Go interfaces for all ALPM operations
+- **Dynamic FFI**: Calls libalpm through [purego](https://github.com/ebitengine/purego)
+- **Eager Symbol Resolution**: Resolves the libalpm 16 bindings on first use
+- **Typed Interfaces**: Go wrappers for supported ALPM operations
 - **Maintainable Structure**: Well-organized codebase with clear separation of concerns
-- **Error Handling**: Comprehensive error types matching ALPM error codes
+- **Error Handling**: Go errors with access to libalpm error details
 
 ## Requirements
 
-- Go 1.21 or later
-- libalpm.so.15 (Arch Linux package manager library)
+- Go 1.26 or later
+- libalpm.so.16
 - Linux system with ALPM installed
 
 ## Installation
@@ -36,23 +37,24 @@ import (
 )
 
 func main() {
-	// Initialize ALPM handle
 	handle, err := alpm.Initialize("/", "/var/lib/pacman")
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer handle.Release()
+	defer func() {
+		if err := handle.Release(); err != nil {
+			log.Printf("release ALPM handle: %v", err)
+		}
+	}()
 
-	// Get local database
 	localDB, err := handle.LocalDB()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Get a package
 	pkg := localDB.Pkg("pacman")
 	if pkg == nil {
-		log.Fatal(err)
+		log.Fatal("package pacman not found")
 	}
 
 	fmt.Printf("Package: %s\n", pkg.Name())
@@ -64,7 +66,6 @@ func main() {
 ### Working with Sync Databases
 
 ```go
-// List registered sync databases
 syncDBs, err := handle.SyncDBs()
 if err != nil {
 	log.Fatal(err)
@@ -78,24 +79,31 @@ for _, db := range syncDBs {
 ### Transactions
 
 ```go
-// Create a transaction
 trans := alpm.NewTransaction(handle)
 
-// Initialize transaction
 err := trans.Init(0)
 if err != nil {
 	log.Fatal(err)
 }
-defer trans.Release()
+defer func() {
+	if err := trans.Release(); err != nil {
+		log.Printf("release transaction: %v", err)
+	}
+}()
 
-// Add a package to install
-pkg, _ := syncDB.GetPkg("vim")
+syncDB, err := handle.SyncDBByName("core")
+if err != nil {
+	log.Fatal(err)
+}
+pkg := syncDB.Pkg("vim")
+if pkg == nil {
+	log.Fatal("package vim not found")
+}
 err = trans.AddPkg(pkg)
 if err != nil {
 	log.Fatal(err)
 }
 
-// Prepare the transaction
 missing, err := trans.Prepare()
 if len(missing) > 0 {
 	fmt.Println("Missing dependencies:")
@@ -107,7 +115,6 @@ if err != nil {
 	log.Fatal(err)
 }
 
-// Commit the transaction
 conflicts, err := trans.Commit()
 if len(conflicts) > 0 {
 	fmt.Println("File conflicts detected!")
@@ -121,16 +128,20 @@ if err != nil {
 `errors.As` to obtain `*alpm.TransactionError` and inspect architecture,
 dependency, package conflict, file conflict, and invalid package details.
 
-## Lazy Loading
+## Library Loading
 
-All C functions are loaded lazily - they are only resolved from the library when first needed. This improves startup time and allows the library to work even if some functions are unavailable.
+On first use, dyalpm opens the exact `libalpm.so.16` SONAME, verifies that
+`alpm_version` reports ABI major 16, and eagerly resolves its bindings. It does
+not fall back to an unversioned `libalpm.so`. A failed load is retried by the
+next operation.
 
 ## Error Handling
 
-Errors are represented using the `errors.Errno` type which matches ALPM's error codes. You can check for specific errors:
+Most operations return Go errors directly. The handle also exposes libalpm's
+current error number and message:
 
 ```go
-if errno := handle.Errno(); errno != errors.ErrOK {
+if errno := handle.Errno(); errno != 0 {
 	fmt.Printf("Error: %s\n", handle.StrError(errno))
 }
 ```

@@ -206,6 +206,9 @@ func PkgFind(pkgs []Package, name string) Package {
 	if len(pkgs) == 0 {
 		return nil
 	}
+	if err := lib.EnsureAlpmLoaded(); err != nil {
+		return nil
+	}
 	if lib.AlpmPkgFind == nil {
 		return nil
 	}
