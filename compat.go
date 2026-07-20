@@ -2,6 +2,10 @@ package dyalpm
 
 import (
 	stderrors "errors"
+	"strings"
+	"unsafe"
+
+	"github.com/Jguer/dyalpm/internal/lib"
 )
 
 // LogLevel represents logging level
@@ -14,6 +18,18 @@ const (
 	LogFunc    LogLevel = 1 << 3
 )
 
+type QuestionType int32
+
+const (
+	QuestionTypeInstallIgnorepkg QuestionType = 1 << iota
+	QuestionTypeReplacePkg
+	QuestionTypeConflictPkg
+	QuestionTypeCorruptedPkg
+	QuestionTypeRemovePkgs
+	QuestionTypeSelectProvider
+	QuestionTypeImportKey
+)
+
 // QuestionAny is a wrapper for question callback data (go-alpm/v2 compatibility)
 type QuestionAny struct {
 	Question Question
@@ -21,8 +37,7 @@ type QuestionAny struct {
 
 // QuestionInstallIgnorepkg returns a QuestionInstallIgnorepkg if this is an install-ignorepkg question
 func (qa QuestionAny) QuestionInstallIgnorepkg() (*QuestionInstallIgnorepkg, error) {
-	// Question type 1 = install ignorepkg
-	if qa.Question.Type == 1 {
+	if QuestionType(qa.Question.Type) == QuestionTypeInstallIgnorepkg {
 		return &QuestionInstallIgnorepkg{q: qa.Question}, nil
 	}
 	return nil, stderrors.New("not an install ignorepkg question")
@@ -30,8 +45,7 @@ func (qa QuestionAny) QuestionInstallIgnorepkg() (*QuestionInstallIgnorepkg, err
 
 // QuestionSelectProvider returns a QuestionSelectProvider if this is a select-provider question
 func (qa QuestionAny) QuestionSelectProvider() (*QuestionSelectProvider, error) {
-	// Question type 4 = select provider
-	if qa.Question.Type == 4 {
+	if QuestionType(qa.Question.Type) == QuestionTypeSelectProvider {
 		return &QuestionSelectProvider{q: qa.Question}, nil
 	}
 	return nil, stderrors.New("not a select provider question")
@@ -56,20 +70,65 @@ type QuestionSelectProvider struct {
 	q Question
 }
 
+type cQuestionSelectProvider struct {
+	Type      int32
+	UseIndex  int32
+	Providers uintptr
+	Depend    uintptr
+}
+
+type cDepend struct {
+	Name        uintptr
+	Version     uintptr
+	Description uintptr
+	NameHash    uintptr
+	Mod         int32
+}
+
+func (qp *QuestionSelectProvider) data() *cQuestionSelectProvider {
+	if qp == nil || qp.q.Ptr == 0 ||
+		QuestionType(qp.q.Type) != QuestionTypeSelectProvider {
+		return nil
+	}
+
+	data := (*cQuestionSelectProvider)(unsafe.Pointer(qp.q.Ptr))
+	if QuestionType(data.Type) != QuestionTypeSelectProvider {
+		return nil
+	}
+	return data
+}
+
 // Dep returns the dependency string being resolved
 func (qp *QuestionSelectProvider) Dep() string {
-	// TODO: implement proper extraction from question struct
-	return ""
+	data := qp.data()
+	if data == nil || data.Depend == 0 {
+		return ""
+	}
+
+	dep := (*cDepend)(unsafe.Pointer(data.Depend))
+	return Depend{
+		Name:    strings.Clone(lib.PtrToString(dep.Name)),
+		Version: strings.Clone(lib.PtrToString(dep.Version)),
+		Mod:     DepMod(dep.Mod),
+	}.String()
 }
 
-// Providers returns the list of provider packages
+// Providers is valid only during the question callback.
 func (qp *QuestionSelectProvider) Providers(h Handle) PackageIterator {
-	// TODO: implement proper extraction from question struct
-	_ = h
-	return PackageIterator{}
+	data := qp.data()
+	if data == nil || data.Providers == 0 {
+		return PackageIterator{}
+	}
+
+	handle, _ := h.(*handle)
+	return newPackageIterator(data.Providers, handle, false)
 }
 
-// SetUseIndex sets which provider index to use (1-based)
+// SetUseIndex sets which provider to use by its zero-based index.
 func (qp *QuestionSelectProvider) SetUseIndex(index int) {
-	qp.q.SetAnswerInt(index)
+	data := qp.data()
+	if data == nil {
+		return
+	}
+	data.UseIndex = clampIntToInt32(index)
 }
