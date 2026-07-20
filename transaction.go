@@ -3,6 +3,7 @@ package dyalpm
 import (
 	stderrors "errors"
 
+	"github.com/Jguer/dyalpm/internal/dyerrors"
 	"github.com/Jguer/dyalpm/internal/lib"
 	alpmlist "github.com/Jguer/dyalpm/internal/list"
 )
@@ -66,7 +67,7 @@ type transaction struct {
 	handle *handle
 }
 
-func (t *transaction) getTransactionList(funcName string, failErr error) (*alpmlist.List, error) {
+func (t *transaction) call(funcName string) (*alpmlist.List, dyerrors.Errno, bool, error) {
 	var fn func(uintptr, *uintptr) int32
 	switch funcName {
 	case "alpm_trans_prepare":
@@ -74,29 +75,20 @@ func (t *transaction) getTransactionList(funcName string, failErr error) (*alpml
 	case "alpm_trans_commit":
 		fn = lib.AlpmTransCommit
 	default:
-		return nil, stderrors.New("missing function: " + funcName)
+		return nil, dyerrors.ErrOK, false, stderrors.New("missing function: " + funcName)
 	}
 
 	if fn == nil {
-		return nil, stderrors.New("missing function: " + funcName)
+		return nil, dyerrors.ErrOK, false, stderrors.New("missing function: " + funcName)
 	}
 
 	var dataListPtr uintptr
 	result := fn(t.handle.ptr, &dataListPtr)
-	if result != 0 {
-		return nil, failErr
-	}
-
-	if dataListPtr == 0 {
-		return nil, nil
-	}
-
 	alpmList := alpmlist.NewList(dataListPtr)
-	if alpmList == nil {
-		return nil, nil
+	if result == 0 {
+		return alpmList, dyerrors.ErrOK, false, nil
 	}
-
-	return alpmList, nil
+	return alpmList, t.handle.Errno(), true, nil
 }
 
 // NewTransaction creates a new transaction for the given handle
@@ -129,17 +121,20 @@ func (t *transaction) Prepare() ([]DepMissing, error) {
 		return nil, ErrInvalidHandle
 	}
 
-	alpmList, err := t.getTransactionList("alpm_trans_prepare", ErrTransactionPrepareFailed)
-	if err != nil || alpmList == nil {
+	alpmList, errno, failed, err := t.call("alpm_trans_prepare")
+	if err != nil {
 		return []DepMissing{}, err
 	}
-	defer alpmList.Free()
+	if alpmList != nil {
+		defer alpmList.Free()
+	}
+	if !failed {
+		return []DepMissing{}, nil
+	}
 
-	missing := collectList(alpmList, func(ptr uintptr) DepMissing {
-		return newDepMissing(ptr)
-	})
-
-	return missing, nil
+	diagnostics := decodePrepareDiagnostics(errno, alpmList)
+	return missingDependencyInterfaces(diagnostics.MissingDependencies),
+		newTransactionError(TransactionPrepare, errno, diagnostics)
 }
 
 func (t *transaction) Commit() ([]FileConflict, error) {
@@ -147,17 +142,20 @@ func (t *transaction) Commit() ([]FileConflict, error) {
 		return nil, ErrInvalidHandle
 	}
 
-	alpmList, err := t.getTransactionList("alpm_trans_commit", ErrTransactionCommitFailed)
-	if err != nil || alpmList == nil {
+	alpmList, errno, failed, err := t.call("alpm_trans_commit")
+	if err != nil {
 		return []FileConflict{}, err
 	}
-	defer alpmList.Free()
+	if alpmList != nil {
+		defer alpmList.Free()
+	}
+	if !failed {
+		return []FileConflict{}, nil
+	}
 
-	conflicts := collectList(alpmList, func(ptr uintptr) FileConflict {
-		return newFileConflict(ptr)
-	})
-
-	return conflicts, nil
+	diagnostics := decodeCommitDiagnostics(errno, alpmList)
+	return fileConflictInterfaces(diagnostics.FileConflicts),
+		newTransactionError(TransactionCommit, errno, diagnostics)
 }
 
 func (t *transaction) Release() error {

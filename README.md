@@ -97,27 +97,29 @@ if err != nil {
 
 // Prepare the transaction
 missing, err := trans.Prepare()
-if err != nil {
-	log.Fatal(err)
-}
-
 if len(missing) > 0 {
 	fmt.Println("Missing dependencies:")
 	for _, dep := range missing {
 		fmt.Printf("  %s requires %s\n", dep.GetTarget(), dep.GetDepend().GetName())
 	}
 }
-
-// Commit the transaction
-conflicts, err := trans.Commit()
 if err != nil {
 	log.Fatal(err)
 }
 
+// Commit the transaction
+conflicts, err := trans.Commit()
 if len(conflicts) > 0 {
 	fmt.Println("File conflicts detected!")
 }
+if err != nil {
+	log.Fatal(err)
+}
 ```
+
+`Prepare` and `Commit` return copied diagnostics with the error. Use
+`errors.As` to obtain `*alpm.TransactionError` and inspect architecture,
+dependency, package conflict, file conflict, and invalid package details.
 
 ## Lazy Loading
 
