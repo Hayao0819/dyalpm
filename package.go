@@ -306,7 +306,7 @@ func (p *package_) getStringListWithFree(funcName string, freeList bool) ([]stri
 		return []string{}, nil
 	}
 	if freeList {
-		defer alpmList.Free()
+		defer alpmList.FreeWith(lib.Free)
 	}
 
 	var items []string
@@ -648,16 +648,13 @@ func (p *package_) Sig() ([]byte, error) {
 	var sigPtr uintptr
 	var sigLen uintptr
 	result := lib.AlpmPkgGetSig(p.ptr, &sigPtr, &sigLen)
+	defer lib.Free(sigPtr)
 	if result != 0 || sigPtr == 0 || sigLen == 0 {
-		return nil, nil // No signature or error
+		return nil, nil
 	}
 
-	// Copy the signature bytes to a Go slice
 	sig := make([]byte, sigLen)
-	base := unsafe.Pointer(sigPtr)
-	for i := uintptr(0); i < sigLen; i++ {
-		sig[i] = *(*byte)(unsafe.Add(base, i))
-	}
+	copy(sig, unsafe.Slice((*byte)(unsafe.Pointer(sigPtr)), sigLen))
 
 	return sig, nil
 }
@@ -811,6 +808,9 @@ type changelogReader struct {
 }
 
 func (r *changelogReader) Read(p []byte) (n int, err error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
 	if r.fp == 0 {
 		return 0, io.EOF
 	}
@@ -836,10 +836,11 @@ func (r *changelogReader) Close() error {
 		return stderrors.New("missing function: alpm_pkg_changelog_close")
 	}
 
-	if lib.AlpmPkgChangelogClose(r.pkg.ptr, r.fp) != 0 {
+	fp := r.fp
+	r.fp = 0
+	if lib.AlpmPkgChangelogClose(r.pkg.ptr, fp) != 0 {
 		return stderrors.New("failed to close changelog")
 	}
-	r.fp = 0
 	return nil
 }
 

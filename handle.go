@@ -523,9 +523,8 @@ func (h *handle) FetchPkgURL(url string) (string, error) {
 	}
 
 	fetchedList := alpmlist.NewList(fetchedListPtr)
-	defer fetchedList.Free()
+	defer fetchedList.FreeWith(lib.Free)
 
-	// Return the first fetched path (since we only requested one URL)
 	if fetchedList.Ptr() != 0 {
 		ptr := fetchedList.Data()
 		if ptr != 0 {

@@ -21,6 +21,10 @@ func collectList[T any](alpmList *alpmlist.List, build func(uintptr) T) []T {
 }
 
 func computeFileSum(funcName, filename string) (string, error) {
+	if err := lib.EnsureAlpmLoaded(); err != nil {
+		return "", err
+	}
+
 	var r1 uintptr
 	switch funcName {
 	case "alpm_compute_md5sum":
@@ -41,9 +45,8 @@ func computeFileSum(funcName, filename string) (string, error) {
 		return "", ErrInvalidPackage
 	}
 
-	res := lib.PtrToString(r1)
-	lib.Free(r1)
-	return res, nil
+	defer lib.Free(r1)
+	return lib.PtrToString(r1), nil
 }
 
 // ComputeMD5Sum computes the MD5 sum of a file
@@ -111,20 +114,18 @@ func (h *handle) ExtractKeyID(identifier string, sig []byte) ([]string, error) {
 
 	runtime.KeepAlive(sig)
 
+	alpmList := alpmlist.NewList(keysListPtr)
+	if alpmList != nil {
+		defer alpmList.FreeWith(lib.Free)
+	}
+
 	if r1 != 0 {
 		return nil, stderrors.New("failed to extract key id")
 	}
 
-	if keysListPtr == 0 {
+	if alpmList == nil {
 		return []string{}, nil
 	}
-
-	alpmList := alpmlist.NewList(keysListPtr)
-	// We need to free the strings in the list too
-	// alpm_list_free_inner(list, free)
-	// For now, let's just free the list structure and hope the strings are managed or short-lived.
-	// Actually, alpm_list_free just frees the nodes.
-	defer alpmList.Free()
 
 	var keys []string
 	for item := alpmList; item != nil && item.Ptr() != 0; item = item.Next() {
