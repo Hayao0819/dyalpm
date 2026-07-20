@@ -213,12 +213,9 @@ func PkgFind(pkgs []Package, name string) Package {
 		return nil
 	}
 
-	var alpmList *alpmlist.List
-	for _, p := range pkgs {
-		pkgImpl, ok := p.(*package_)
-		if ok {
-			alpmList = alpmlist.Add(alpmList, pkgImpl.ptr)
-		}
+	alpmList, err := packageList(pkgs)
+	if err != nil {
+		return nil
 	}
 	defer alpmList.Free()
 
@@ -228,18 +225,12 @@ func PkgFind(pkgs []Package, name string) Package {
 		return nil
 	}
 
-	// We need a handle to create a Package.
-	// This is a bit tricky since PkgFind doesn't have a handle.
-	// But the packages in the input list should have handles.
-	var h *handle
-	if len(pkgs) > 0 {
-		pkgImpl, ok := pkgs[0].(*package_)
-		if ok {
-			h = pkgImpl.handle
-		}
+	pkgImpl, err := internalPackage(pkgs[0])
+	if err != nil {
+		return nil
 	}
 
-	return newPackage(pkgPtr, h)
+	return newPackage(pkgPtr, pkgImpl.handle)
 }
 
 func (p *package_) CheckDepends() []Depend {
@@ -788,12 +779,9 @@ func (p *package_) SyncGetNewVersion(dbsSync []Database) Package {
 		return nil
 	}
 
-	var dbList *alpmlist.List
-	for _, db := range dbsSync {
-		dbImpl, ok := db.(*database)
-		if ok {
-			dbList = alpmlist.Add(dbList, dbImpl.ptr)
-		}
+	dbList, err := databaseList(dbsSync)
+	if err != nil {
+		return nil
 	}
 	defer dbList.Free()
 

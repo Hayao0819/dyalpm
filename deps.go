@@ -426,28 +426,28 @@ func (h *handle) CheckDeps(pkgs []Package, remPkgs []Package, upgradePkgs []Pack
 	if h.ptr == 0 {
 		return nil, alpmerrors.ErrHandleNull
 	}
-	if lib.AlpmCheckDeps == nil {
-		return nil, stderrors.New("missing function: alpm_checkdeps")
-	}
 
-	var pkgList, remPkgList, upgradePkgList *alpmlist.List
-	for _, p := range pkgs {
-		pkgImpl, _ := p.(*package_)
-		pkgList = alpmlist.Add(pkgList, pkgImpl.ptr)
+	pkgList, err := packageList(pkgs)
+	if err != nil {
+		return nil, err
 	}
 	defer pkgList.Free()
 
-	for _, p := range remPkgs {
-		pkgImpl, _ := p.(*package_)
-		remPkgList = alpmlist.Add(remPkgList, pkgImpl.ptr)
+	remPkgList, err := packageList(remPkgs)
+	if err != nil {
+		return nil, err
 	}
 	defer remPkgList.Free()
 
-	for _, p := range upgradePkgs {
-		pkgImpl, _ := p.(*package_)
-		upgradePkgList = alpmlist.Add(upgradePkgList, pkgImpl.ptr)
+	upgradePkgList, err := packageList(upgradePkgs)
+	if err != nil {
+		return nil, err
 	}
 	defer upgradePkgList.Free()
+
+	if lib.AlpmCheckDeps == nil {
+		return nil, stderrors.New("missing function: alpm_checkdeps")
+	}
 
 	rev := int32(0)
 	if reverseDeps {
@@ -476,16 +476,16 @@ func (h *handle) CheckConflicts(pkgs []Package) ([]Conflict, error) {
 	if h.ptr == 0 {
 		return nil, alpmerrors.ErrHandleNull
 	}
+
+	pkgList, err := packageList(pkgs)
+	if err != nil {
+		return nil, err
+	}
+	defer pkgList.Free()
+
 	if lib.AlpmCheckConflicts == nil {
 		return nil, stderrors.New("missing function: alpm_checkconflicts")
 	}
-
-	var pkgList *alpmlist.List
-	for _, p := range pkgs {
-		pkgImpl, _ := p.(*package_)
-		pkgList = alpmlist.Add(pkgList, pkgImpl.ptr)
-	}
-	defer pkgList.Free()
 
 	r1 := lib.AlpmCheckConflicts(h.ptr, pkgList.Ptr())
 	if r1 == 0 {
@@ -518,18 +518,20 @@ func FindSatisfier(pkgs []Package, depstring string) Package {
 		return nil
 	}
 
-	var pkgList *alpmlist.List
-	var h *handle
-	for _, p := range pkgs {
-		pkgImpl, ok := p.(*package_)
-		if ok {
-			pkgList = alpmlist.Add(pkgList, pkgImpl.ptr)
-			if h == nil {
-				h = pkgImpl.handle
-			}
-		}
+	pkgList, err := packageList(pkgs)
+	if err != nil {
+		return nil
 	}
 	defer pkgList.Free()
+
+	var h *handle
+	if len(pkgs) != 0 {
+		pkgImpl, err := internalPackage(pkgs[0])
+		if err != nil {
+			return nil
+		}
+		h = pkgImpl.handle
+	}
 
 	r1 := lib.AlpmFindSatisfier(pkgList.Ptr(), depstring)
 
@@ -548,12 +550,9 @@ func (h *handle) FindDBSatisfier(dbs []Database, depstring string) Package {
 		return nil
 	}
 
-	var dbList *alpmlist.List
-	for _, db := range dbs {
-		dbImpl, ok := db.(*database)
-		if ok {
-			dbList = alpmlist.Add(dbList, dbImpl.ptr)
-		}
+	dbList, err := databaseList(dbs)
+	if err != nil {
+		return nil
 	}
 	defer dbList.Free()
 

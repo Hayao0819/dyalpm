@@ -93,9 +93,12 @@ func (t *transaction) call(funcName string) (*alpmlist.List, alpmerrors.Errno, b
 
 // NewTransaction creates a new transaction for the given handle
 func NewTransaction(h Handle) Transaction {
-	handle := h.(*handle)
+	handleValue, err := internalHandle(h)
+	if err != nil {
+		handleValue = &handle{}
+	}
 	return &transaction{
-		handle: handle,
+		handle: handleValue,
 	}
 }
 
@@ -180,11 +183,15 @@ func (t *transaction) AddPkg(pkg Package) error {
 		return ErrInvalidHandle
 	}
 
+	pkgImpl, err := internalPackage(pkg)
+	if err != nil {
+		return err
+	}
+
 	if lib.AlpmAddPkg == nil {
 		return stderrors.New("missing function: alpm_add_pkg")
 	}
 
-	pkgImpl := pkg.(*package_)
 	result := lib.AlpmAddPkg(t.handle.ptr, pkgImpl.ptr)
 	if result != 0 {
 		return ErrAddPackageFailed
@@ -198,11 +205,15 @@ func (t *transaction) RemovePkg(pkg Package) error {
 		return ErrInvalidHandle
 	}
 
+	pkgImpl, err := internalPackage(pkg)
+	if err != nil {
+		return err
+	}
+
 	if lib.AlpmRemovePkg == nil {
 		return stderrors.New("missing function: alpm_remove_pkg")
 	}
 
-	pkgImpl := pkg.(*package_)
 	result := lib.AlpmRemovePkg(t.handle.ptr, pkgImpl.ptr)
 	if result != 0 {
 		return ErrRemovePackageFailed

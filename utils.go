@@ -63,18 +63,16 @@ func (h *handle) FindGroupPkgs(dbs []Database, name string) ([]Package, error) {
 	if h.ptr == 0 {
 		return nil, ErrInvalidHandle
 	}
+
+	dbList, err := databaseList(dbs)
+	if err != nil {
+		return nil, err
+	}
+	defer dbList.Free()
+
 	if lib.AlpmFindGroupPkgs == nil {
 		return nil, stderrors.New("missing function: alpm_find_group_pkgs")
 	}
-
-	var dbList *alpmlist.List
-	for _, db := range dbs {
-		dbImpl, ok := db.(*database)
-		if ok {
-			dbList = alpmlist.Add(dbList, dbImpl.ptr)
-		}
-	}
-	defer dbList.Free()
 
 	r1 := lib.AlpmFindGroupPkgs(dbList.Ptr(), name)
 
