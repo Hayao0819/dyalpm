@@ -7,77 +7,14 @@ import (
 	"unsafe"
 
 	"github.com/ebitengine/purego"
+
+	"github.com/Jguer/dyalpm/internal/testutil/cmem"
 )
 
 type cListNode struct {
 	Data uintptr
 	Prev uintptr
 	Next uintptr
-}
-
-type cAllocator struct {
-	handle uintptr
-	calloc func(uintptr, uintptr) uintptr
-	free   func(uintptr)
-}
-
-func newCAllocator(t *testing.T) *cAllocator {
-	t.Helper()
-
-	handle, err := purego.Dlopen("libc.so.6", purego.RTLD_NOW)
-	if err != nil {
-		handle, err = purego.Dlopen("libc.so", purego.RTLD_NOW)
-		if err != nil {
-			t.Fatalf("load libc: %v", err)
-		}
-	}
-
-	var calloc func(uintptr, uintptr) uintptr
-	callocSymbol, err := purego.Dlsym(handle, "calloc")
-	if err != nil {
-		t.Fatalf("resolve calloc: %v", err)
-	}
-	purego.RegisterFunc(&calloc, callocSymbol)
-
-	var free func(uintptr)
-	freeSymbol, err := purego.Dlsym(handle, "free")
-	if err != nil {
-		t.Fatalf("resolve free: %v", err)
-	}
-	purego.RegisterFunc(&free, freeSymbol)
-
-	allocator := &cAllocator{
-		handle: handle,
-		calloc: calloc,
-		free:   free,
-	}
-	t.Cleanup(func() {
-		if err := purego.Dlclose(allocator.handle); err != nil {
-			t.Errorf("close libc: %v", err)
-		}
-	})
-	return allocator
-}
-
-func (a *cAllocator) alloc(t *testing.T, size uintptr) uintptr {
-	t.Helper()
-
-	ptr := a.calloc(1, size)
-	if ptr == 0 {
-		t.Fatal("calloc returned nil")
-	}
-	t.Cleanup(func() {
-		a.free(ptr)
-	})
-	return ptr
-}
-
-func (a *cAllocator) string(t *testing.T, value string) uintptr {
-	t.Helper()
-
-	ptr := a.alloc(t, uintptr(len(value)+1))
-	copy(unsafe.Slice((*byte)(unsafe.Pointer(ptr)), len(value)), value)
-	return ptr
 }
 
 func TestQuestionTypeValues(t *testing.T) {
@@ -139,18 +76,16 @@ func TestQuestionSelectProviderRejectsOtherQuestionTypes(t *testing.T) {
 }
 
 func TestQuestionSelectProviderDecodesPayload(t *testing.T) {
-	allocator := newCAllocator(t)
-
-	dependPtr := allocator.alloc(t, unsafe.Sizeof(cDepend{}))
+	dependPtr := cmem.Alloc(t, unsafe.Sizeof(cDepend{}))
 	depend := (*cDepend)(unsafe.Pointer(dependPtr))
-	depend.Name = allocator.string(t, "java-runtime")
-	depend.Version = allocator.string(t, "17")
+	depend.Name = cmem.String(t, "java-runtime")
+	depend.Version = cmem.String(t, "17")
 	depend.Mod = int32(DepModGE)
 
-	firstPackage := allocator.alloc(t, 1)
-	secondPackage := allocator.alloc(t, 1)
-	firstNodePtr := allocator.alloc(t, unsafe.Sizeof(cListNode{}))
-	secondNodePtr := allocator.alloc(t, unsafe.Sizeof(cListNode{}))
+	firstPackage := cmem.Alloc(t, 1)
+	secondPackage := cmem.Alloc(t, 1)
+	firstNodePtr := cmem.Alloc(t, unsafe.Sizeof(cListNode{}))
+	secondNodePtr := cmem.Alloc(t, unsafe.Sizeof(cListNode{}))
 	firstNode := (*cListNode)(unsafe.Pointer(firstNodePtr))
 	secondNode := (*cListNode)(unsafe.Pointer(secondNodePtr))
 	firstNode.Data = firstPackage
@@ -158,7 +93,7 @@ func TestQuestionSelectProviderDecodesPayload(t *testing.T) {
 	secondNode.Data = secondPackage
 	secondNode.Prev = firstNodePtr
 
-	questionPtr := allocator.alloc(t, unsafe.Sizeof(cQuestionSelectProvider{}))
+	questionPtr := cmem.Alloc(t, unsafe.Sizeof(cQuestionSelectProvider{}))
 	rawQuestion := (*cQuestionSelectProvider)(unsafe.Pointer(questionPtr))
 	rawQuestion.Type = int32(QuestionTypeSelectProvider)
 	rawQuestion.UseIndex = -1
@@ -204,8 +139,7 @@ func TestQuestionSelectProviderDecodesPayload(t *testing.T) {
 }
 
 func TestQuestionCallbackDecodesSelectProvider(t *testing.T) {
-	allocator := newCAllocator(t)
-	questionPtr := allocator.alloc(t, unsafe.Sizeof(cQuestionSelectProvider{}))
+	questionPtr := cmem.Alloc(t, unsafe.Sizeof(cQuestionSelectProvider{}))
 	rawQuestion := (*cQuestionSelectProvider)(unsafe.Pointer(questionPtr))
 	rawQuestion.Type = int32(QuestionTypeSelectProvider)
 	rawQuestion.UseIndex = -1

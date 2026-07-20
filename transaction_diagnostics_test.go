@@ -2,7 +2,6 @@ package dyalpm
 
 import (
 	"errors"
-	"runtime"
 	"testing"
 
 	alpmerrors "github.com/Jguer/dyalpm/errors"
@@ -12,26 +11,24 @@ import (
 func TestTransactionPrepareDiagnostics(t *testing.T) {
 	t.Run("missing dependency", func(t *testing.T) {
 		log := installTransactionBindings(t)
-		var pinner runtime.Pinner
-		t.Cleanup(pinner.Unpin)
-		target, targetPtr := transactionCString(&pinner, "consumer")
-		name, namePtr := transactionCString(&pinner, "provider")
-		version, versionPtr := transactionCString(&pinner, "2")
-		causing, causingPtr := transactionCString(&pinner, "upgrade")
+		target, targetPtr := transactionCString(t, "consumer")
+		name, namePtr := transactionCString(t, "provider")
+		version, versionPtr := transactionCString(t, "2")
+		causing, causingPtr := transactionCString(t, "upgrade")
 		depend := &transactionTestDepend{
 			name:    namePtr,
 			version: versionPtr,
 			mod:     int32(DepModGE),
 		}
-		dependPtr := transactionPinnedPointer(&pinner, depend)
+		dependPtr := transactionPointer(t, depend)
 		missing := &transactionTestMissing{
 			target:     targetPtr,
 			depend:     dependPtr,
 			causingPkg: causingPtr,
 		}
-		missingPtr := transactionPinnedPointer(&pinner, missing)
+		missingPtr := transactionPointer(t, missing)
 		list := &transactionTestList{data: missingPtr}
-		listPtr := transactionPinnedPointer(&pinner, list)
+		listPtr := transactionPointer(t, list)
 		stubPrepare(t, listPtr, alpmerrors.ErrUnsatisfiedDeps)
 
 		values, err := (&transaction{handle: &handle{ptr: 1}}).Prepare()
@@ -51,10 +48,10 @@ func TestTransactionPrepareDiagnostics(t *testing.T) {
 			got.GetCausingPkg() != "upgrade" {
 			t.Fatalf("Prepare() missing dependency = %#v", got)
 		}
-		clear(*target)
-		clear(*name)
-		clear(*version)
-		clear(*causing)
+		clear(target)
+		clear(name)
+		clear(version)
+		clear(causing)
 		if got.GetTarget() != "consumer" ||
 			got.GetDepend().ComputeString() != "provider>=2" {
 			t.Fatal("Prepare() returned borrowed diagnostic strings")
@@ -67,18 +64,13 @@ func TestTransactionPrepareDiagnostics(t *testing.T) {
 		}
 		assertFreed(t, log.lists, listPtr)
 		assertFreed(t, log.missing, missingPtr)
-		runtime.KeepAlive(depend)
-		runtime.KeepAlive(missing)
-		runtime.KeepAlive(list)
 	})
 
 	t.Run("invalid architecture", func(t *testing.T) {
 		log := installTransactionBindings(t)
-		var pinner runtime.Pinner
-		t.Cleanup(pinner.Unpin)
-		name, namePtr := transactionCString(&pinner, "foreign-1.pkg.tar.zst")
+		_, namePtr := transactionCString(t, "foreign-1.pkg.tar.zst")
 		list := &transactionTestList{data: namePtr}
-		listPtr := transactionPinnedPointer(&pinner, list)
+		listPtr := transactionPointer(t, list)
 		stubPrepare(t, listPtr, alpmerrors.ErrPkgInvalidArch)
 
 		values, err := (&transaction{handle: &handle{ptr: 1}}).Prepare()
@@ -95,22 +87,18 @@ func TestTransactionPrepareDiagnostics(t *testing.T) {
 		}
 		assertFreed(t, log.strings, namePtr)
 		assertFreed(t, log.lists, listPtr)
-		runtime.KeepAlive(name)
-		runtime.KeepAlive(list)
 	})
 
 	t.Run("package conflict", func(t *testing.T) {
 		log := installTransactionBindings(t)
-		var pinner runtime.Pinner
-		t.Cleanup(pinner.Unpin)
-		first, firstPtr := transactionCString(&pinner, "first")
-		second, secondPtr := transactionCString(&pinner, "second")
-		reasonName, reasonNamePtr := transactionCString(&pinner, "virtual")
+		_, firstPtr := transactionCString(t, "first")
+		_, secondPtr := transactionCString(t, "second")
+		_, reasonNamePtr := transactionCString(t, "virtual")
 		reason := &transactionTestDepend{
 			name: reasonNamePtr,
 			mod:  int32(DepModAny),
 		}
-		reasonPtr := transactionPinnedPointer(&pinner, reason)
+		reasonPtr := transactionPointer(t, reason)
 		const firstPackage = uintptr(0x101)
 		const secondPackage = uintptr(0x202)
 		conflict := &[3]uintptr{
@@ -118,9 +106,9 @@ func TestTransactionPrepareDiagnostics(t *testing.T) {
 			secondPackage,
 			reasonPtr,
 		}
-		conflictPtr := transactionPinnedPointer(&pinner, conflict)
+		conflictPtr := transactionPointer(t, conflict)
 		list := &transactionTestList{data: conflictPtr}
-		listPtr := transactionPinnedPointer(&pinner, list)
+		listPtr := transactionPointer(t, list)
 		lib.AlpmPkgGetName = func(ptr uintptr) uintptr {
 			switch ptr {
 			case firstPackage:
@@ -147,11 +135,5 @@ func TestTransactionPrepareDiagnostics(t *testing.T) {
 		}
 		assertFreed(t, log.conflicts, conflictPtr)
 		assertFreed(t, log.lists, listPtr)
-		runtime.KeepAlive(first)
-		runtime.KeepAlive(second)
-		runtime.KeepAlive(reasonName)
-		runtime.KeepAlive(reason)
-		runtime.KeepAlive(conflict)
-		runtime.KeepAlive(list)
 	})
 }

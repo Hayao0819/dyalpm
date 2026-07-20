@@ -9,7 +9,7 @@ import (
 func TestAlpmFuncSignatures(t *testing.T) {
 	var _ func() int32 = AlpmCapabilities
 	var _ func(uintptr) uintptr = AlpmListCount
-	var _ func(uintptr) int32 = AlpmSiglistCleanup
+	var _ func(unsafe.Pointer) int32 = AlpmSiglistCleanup
 	var _ func(uintptr, string, uintptr, uintptr, *uintptr) int32 = AlpmExtractKeyID
 	var _ func(uintptr) int64 = AlpmPkgGetBuildDate
 	var _ func(uintptr) int64 = AlpmPkgGetInstallDate
@@ -130,7 +130,7 @@ func TestAlpmSiglistCleanupABI(t *testing.T) {
 	}
 
 	siglist := [2]uintptr{}
-	if result := AlpmSiglistCleanup(uintptr(unsafe.Pointer(&siglist[0]))); result != 0 {
+	if result := AlpmSiglistCleanup(unsafe.Pointer(&siglist[0])); result != 0 {
 		t.Fatalf("alpm_siglist_cleanup returned %d", result)
 	}
 	runtime.KeepAlive(siglist)

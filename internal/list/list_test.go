@@ -1,35 +1,27 @@
 package alpmList
 
 import (
-	"runtime"
 	"testing"
 	"unsafe"
 
 	"github.com/Jguer/dyalpm/internal/lib"
+	"github.com/Jguer/dyalpm/internal/testutil/cmem"
 )
 
-// alpmListNode represents the C struct alpm_list_t layout for testing
-// struct alpm_list_t {
-//
-//	void *data;
-//	alpm_list_t *prev;
-//	alpm_list_t *next;
-//
-// }
 type alpmListNode struct {
 	data uintptr
 	prev uintptr
 	next uintptr
 }
 
-// createTestList creates a linked list of nodes with the given data values.
-// Returns the head of the list.
-func createTestList(data []uintptr) (*List, []alpmListNode) {
+func createTestList(t *testing.T, data []uintptr) *List {
+	t.Helper()
 	if len(data) == 0 {
-		return nil, nil
+		return nil
 	}
 
-	nodes := make([]alpmListNode, len(data))
+	size := uintptr(len(data)) * unsafe.Sizeof(alpmListNode{})
+	nodes := unsafe.Slice((*alpmListNode)(unsafe.Pointer(cmem.Alloc(t, size))), len(data))
 	for i := range nodes {
 		nodes[i].data = data[i]
 		if i > 0 {
@@ -40,7 +32,7 @@ func createTestList(data []uintptr) (*List, []alpmListNode) {
 		}
 	}
 
-	return NewList(uintptr(unsafe.Pointer(&nodes[0]))), nodes
+	return NewList(uintptr(unsafe.Pointer(&nodes[0])))
 }
 
 func TestNewList_Nil(t *testing.T) {
@@ -51,8 +43,7 @@ func TestNewList_Nil(t *testing.T) {
 }
 
 func TestNewList_Valid(t *testing.T) {
-	node := alpmListNode{data: 42}
-	l := NewList(uintptr(unsafe.Pointer(&node)))
+	l := createTestList(t, []uintptr{42})
 	if l == nil {
 		t.Fatal("NewList should not return nil for valid pointer")
 	}
@@ -69,8 +60,7 @@ func TestList_Ptr_Nil(t *testing.T) {
 }
 
 func TestList_Data(t *testing.T) {
-	node := alpmListNode{data: 0xDEADBEEF}
-	l := NewList(uintptr(unsafe.Pointer(&node)))
+	l := createTestList(t, []uintptr{0xDEADBEEF})
 
 	data := l.Data()
 	if data != 0xDEADBEEF {
@@ -79,7 +69,7 @@ func TestList_Data(t *testing.T) {
 }
 
 func TestList_Next(t *testing.T) {
-	l, _ := createTestList([]uintptr{100, 200, 300})
+	l := createTestList(t, []uintptr{100, 200, 300})
 
 	next := l.Next()
 	if next == nil {
@@ -104,7 +94,7 @@ func TestList_Next(t *testing.T) {
 }
 
 func TestList_Prev(t *testing.T) {
-	l, _ := createTestList([]uintptr{100, 200, 300})
+	l := createTestList(t, []uintptr{100, 200, 300})
 
 	// Move to end
 	end := l.Next().Next()
@@ -135,7 +125,7 @@ func TestList_Prev(t *testing.T) {
 }
 
 func TestList_Iterator(t *testing.T) {
-	l, _ := createTestList([]uintptr{10, 20, 30})
+	l := createTestList(t, []uintptr{10, 20, 30})
 
 	it := l.Iterator()
 	if it == nil {
@@ -148,7 +138,7 @@ func TestList_Iterator(t *testing.T) {
 }
 
 func TestListIterator_Next(t *testing.T) {
-	l, _ := createTestList([]uintptr{10, 20, 30})
+	l := createTestList(t, []uintptr{10, 20, 30})
 	it := l.Iterator()
 
 	values := []uintptr{}
@@ -183,7 +173,7 @@ func TestListIterator_Empty(t *testing.T) {
 }
 
 func TestList_ToSlice(t *testing.T) {
-	l, _ := createTestList([]uintptr{100, 200, 300})
+	l := createTestList(t, []uintptr{100, 200, 300})
 
 	slice := l.ToSlice()
 	if len(slice) != 3 {
@@ -219,7 +209,7 @@ func TestList_Count_Manual(t *testing.T) {
 	// The FFI path may not work correctly without libalpm loaded.
 	// This test verifies the structure works - actual count verification
 	// happens in the integration tests.
-	l, _ := createTestList([]uintptr{1, 2, 3, 4, 5})
+	l := createTestList(t, []uintptr{1, 2, 3, 4, 5})
 
 	// At minimum, Count should not panic
 	count := l.Count()
@@ -238,7 +228,7 @@ func TestList_Count_Manual(t *testing.T) {
 }
 
 func TestList_SingleElement(t *testing.T) {
-	l, _ := createTestList([]uintptr{42})
+	l := createTestList(t, []uintptr{42})
 
 	if l.Data() != 42 {
 		t.Errorf("Data() = %d, want 42", l.Data())
@@ -262,7 +252,7 @@ func TestListIterator_ForLargeList(t *testing.T) {
 		data[i] = uintptr(i)
 	}
 
-	l, _ := createTestList(data)
+	l := createTestList(t, data)
 	it := l.Iterator()
 
 	count := 0
@@ -307,7 +297,7 @@ func TestList_ZeroPtr_Prev(t *testing.T) {
 }
 
 func TestList_FreeWith(t *testing.T) {
-	l, nodes := createTestList([]uintptr{10, 0, 30})
+	l := createTestList(t, []uintptr{10, 0, 30})
 	head := l.Ptr()
 
 	originalListFree := lib.AlpmListFree
@@ -324,7 +314,6 @@ func TestList_FreeWith(t *testing.T) {
 	l.FreeWith(func(ptr uintptr) {
 		freedData = append(freedData, ptr)
 	})
-	runtime.KeepAlive(nodes)
 
 	if len(freedData) != 2 || freedData[0] != 10 || freedData[1] != 30 {
 		t.Fatalf("freed data = %v, want [10 30]", freedData)

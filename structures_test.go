@@ -5,75 +5,12 @@ package dyalpm
 import (
 	"testing"
 	"unsafe"
-
-	"github.com/ebitengine/purego"
 )
 
 type abiListNode struct {
 	Data uintptr
 	Prev uintptr
 	Next uintptr
-}
-
-type abiAllocator struct {
-	handle uintptr
-	calloc func(uintptr, uintptr) uintptr
-	free   func(uintptr)
-}
-
-func newABIAllocator(t *testing.T) *abiAllocator {
-	t.Helper()
-
-	handle, err := purego.Dlopen("libc.so.6", purego.RTLD_NOW)
-	if err != nil {
-		handle, err = purego.Dlopen("libc.so", purego.RTLD_NOW)
-		if err != nil {
-			t.Fatalf("load libc: %v", err)
-		}
-	}
-
-	var calloc func(uintptr, uintptr) uintptr
-	symbol, err := purego.Dlsym(handle, "calloc")
-	if err != nil {
-		t.Fatalf("resolve calloc: %v", err)
-	}
-	purego.RegisterFunc(&calloc, symbol)
-
-	var free func(uintptr)
-	symbol, err = purego.Dlsym(handle, "free")
-	if err != nil {
-		t.Fatalf("resolve free: %v", err)
-	}
-	purego.RegisterFunc(&free, symbol)
-
-	allocator := &abiAllocator{handle: handle, calloc: calloc, free: free}
-	t.Cleanup(func() {
-		if err := purego.Dlclose(allocator.handle); err != nil {
-			t.Errorf("close libc: %v", err)
-		}
-	})
-	return allocator
-}
-
-func (a *abiAllocator) alloc(t *testing.T, size uintptr) uintptr {
-	t.Helper()
-
-	ptr := a.calloc(1, size)
-	if ptr == 0 {
-		t.Fatal("calloc returned nil")
-	}
-	t.Cleanup(func() {
-		a.free(ptr)
-	})
-	return ptr
-}
-
-func (a *abiAllocator) string(t *testing.T, value string) uintptr {
-	t.Helper()
-
-	ptr := a.alloc(t, uintptr(len(value)+1))
-	copy(unsafe.Slice((*byte)(unsafe.Pointer(ptr)), len(value)), value)
-	return ptr
 }
 
 func TestAlpmStructureLayouts(t *testing.T) {

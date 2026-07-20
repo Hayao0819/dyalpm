@@ -7,6 +7,7 @@ import (
 	"unsafe"
 
 	"github.com/Jguer/dyalpm/internal/lib"
+	"github.com/Jguer/dyalpm/internal/testutil/cmem"
 )
 
 func TestSignatureResultDecoding(t *testing.T) {
@@ -27,9 +28,8 @@ func TestSignatureResultDecoding(t *testing.T) {
 		}
 	}
 
-	allocator := newABIAllocator(t)
-	fingerprint := allocator.string(t, "0123456789ABCDEF")
-	resultsPtr := allocator.alloc(t, 2*unsafe.Sizeof(alpmSigResult{}))
+	fingerprint := cmem.String(t, "0123456789ABCDEF")
+	resultsPtr := cmem.Alloc(t, 2*unsafe.Sizeof(alpmSigResult{}))
 	results := unsafe.Slice((*alpmSigResult)(unsafe.Pointer(resultsPtr)), 2)
 	results[0].Key.Fingerprint = fingerprint
 	results[0].Status = int32(SigStatusKeyExpired)
@@ -37,12 +37,12 @@ func TestSignatureResultDecoding(t *testing.T) {
 	results[1].Status = int32(SigStatusInvalid)
 	results[1].Validity = int32(SigValidityNever)
 
-	listPtr := allocator.alloc(t, unsafe.Sizeof(alpmSigList{}))
+	listPtr := cmem.Alloc(t, unsafe.Sizeof(alpmSigList{}))
 	list := (*alpmSigList)(unsafe.Pointer(listPtr))
 	list.Count = 2
 	list.Results = resultsPtr
 
-	decoded := decodeSigList(listPtr)
+	decoded := decodeSigList(list)
 	if len(decoded.Results) != 2 {
 		t.Fatalf("signature count = %d, want 2", len(decoded.Results))
 	}
@@ -63,14 +63,13 @@ func TestSignatureResultDecoding(t *testing.T) {
 }
 
 func TestPackageXDataDecoding(t *testing.T) {
-	allocator := newABIAllocator(t)
-	firstName := allocator.string(t, "pkgtype")
-	firstValue := allocator.string(t, "split")
-	secondName := allocator.string(t, "custom")
-	secondValue := allocator.string(t, "value")
+	firstName := cmem.String(t, "pkgtype")
+	firstValue := cmem.String(t, "split")
+	secondName := cmem.String(t, "custom")
+	secondValue := cmem.String(t, "value")
 
-	firstDataPtr := allocator.alloc(t, unsafe.Sizeof(alpmPackageXData{}))
-	secondDataPtr := allocator.alloc(t, unsafe.Sizeof(alpmPackageXData{}))
+	firstDataPtr := cmem.Alloc(t, unsafe.Sizeof(alpmPackageXData{}))
+	secondDataPtr := cmem.Alloc(t, unsafe.Sizeof(alpmPackageXData{}))
 	*(*alpmPackageXData)(unsafe.Pointer(firstDataPtr)) = alpmPackageXData{
 		Name: firstName, Value: firstValue,
 	}
@@ -78,8 +77,8 @@ func TestPackageXDataDecoding(t *testing.T) {
 		Name: secondName, Value: secondValue,
 	}
 
-	firstNodePtr := allocator.alloc(t, unsafe.Sizeof(abiListNode{}))
-	secondNodePtr := allocator.alloc(t, unsafe.Sizeof(abiListNode{}))
+	firstNodePtr := cmem.Alloc(t, unsafe.Sizeof(abiListNode{}))
+	secondNodePtr := cmem.Alloc(t, unsafe.Sizeof(abiListNode{}))
 	firstNode := (*abiListNode)(unsafe.Pointer(firstNodePtr))
 	secondNode := (*abiListNode)(unsafe.Pointer(secondNodePtr))
 	firstNode.Data = firstDataPtr

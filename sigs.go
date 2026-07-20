@@ -2,6 +2,7 @@ package dyalpm
 
 import (
 	stderrors "errors"
+	"runtime"
 	"strings"
 	"unsafe"
 
@@ -68,13 +69,11 @@ type alpmSigResult struct {
 	Validity int32
 }
 
-func decodeSigList(ptr uintptr) SigList {
-	if ptr == 0 {
+func decodeSigList(sigList *alpmSigList) SigList {
+	if sigList == nil {
 		return SigList{}
 	}
 
-	base := unsafe.Pointer(ptr)
-	sigList := (*alpmSigList)(base)
 	if sigList.Count == 0 || sigList.Results == 0 {
 		return SigList{}
 	}
@@ -97,7 +96,7 @@ func decodeSigList(ptr uintptr) SigList {
 }
 
 func checkPGPSignature(ptr uintptr, handle *handle, funcName string) (SigList, error) {
-	var fn func(uintptr, uintptr) int32
+	var fn func(uintptr, unsafe.Pointer) int32
 	switch funcName {
 	case "alpm_db_check_pgp_signature":
 		fn = lib.AlpmDBCheckPGPSignature
@@ -112,12 +111,13 @@ func checkPGPSignature(ptr uintptr, handle *handle, funcName string) (SigList, e
 	}
 
 	var sigList alpmSigList
-	sigListPtr := uintptr(unsafe.Pointer(&sigList))
+	sigListPtr := unsafe.Pointer(&sigList)
 
 	result := fn(ptr, sigListPtr)
-	decoded := decodeSigList(sigListPtr)
+	decoded := decodeSigList(&sigList)
 
 	cleanupErr := handle.SigListCleanup(sigListPtr)
+	runtime.KeepAlive(&sigList)
 
 	if result != 0 {
 		err := stderrors.New("signature check failed")
@@ -133,8 +133,7 @@ func checkPGPSignature(ptr uintptr, handle *handle, funcName string) (SigList, e
 	return decoded, nil
 }
 
-// SigListCleanup cleans up an ALPM signature list
-func (h *handle) SigListCleanup(siglistPtr uintptr) error {
+func (h *handle) SigListCleanup(siglistPtr unsafe.Pointer) error {
 	if h.ptr == 0 {
 		return ErrInvalidHandle
 	}

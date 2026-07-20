@@ -1,12 +1,12 @@
 package dyalpm
 
 import (
-	"runtime"
 	"testing"
 	"unsafe"
 
 	alpmerrors "github.com/Jguer/dyalpm/errors"
 	"github.com/Jguer/dyalpm/internal/lib"
+	"github.com/Jguer/dyalpm/internal/testutil/cmem"
 )
 
 type transactionTestList struct {
@@ -110,15 +110,17 @@ func stubCommit(t *testing.T, list uintptr, errno alpmerrors.Errno) {
 	}
 }
 
-func transactionCString(pinner *runtime.Pinner, value string) (*[]byte, uintptr) {
-	buffer := append([]byte(value), 0)
-	pinner.Pin(&buffer[0])
-	return &buffer, uintptr(unsafe.Pointer(&buffer[0]))
+func transactionCString(t *testing.T, value string) ([]byte, uintptr) {
+	t.Helper()
+	ptr, buffer := cmem.Bytes(t, append([]byte(value), 0))
+	return buffer, ptr
 }
 
-func transactionPinnedPointer[T any](pinner *runtime.Pinner, value *T) uintptr {
-	pinner.Pin(value)
-	return uintptr(unsafe.Pointer(value))
+func transactionPointer[T any](t *testing.T, value *T) uintptr {
+	t.Helper()
+	ptr := cmem.Alloc(t, unsafe.Sizeof(*value))
+	*(*T)(unsafe.Pointer(ptr)) = *value
+	return ptr
 }
 
 func assertFreed(t *testing.T, values []uintptr, want uintptr) {

@@ -7,15 +7,15 @@ import (
 	"unsafe"
 
 	"github.com/Jguer/dyalpm/internal/lib"
+	"github.com/Jguer/dyalpm/internal/testutil/cmem"
 )
 
 func TestDependencyDecodingPreservesMetadata(t *testing.T) {
-	allocator := newABIAllocator(t)
-	ptr := allocator.alloc(t, unsafe.Sizeof(alpmDepend{}))
+	ptr := cmem.Alloc(t, unsafe.Sizeof(alpmDepend{}))
 	raw := (*alpmDepend)(unsafe.Pointer(ptr))
-	raw.Name = allocator.string(t, "python")
-	raw.Version = allocator.string(t, "3.14")
-	raw.Description = allocator.string(t, "runtime")
+	raw.Name = cmem.String(t, "python")
+	raw.Version = cmem.String(t, "3.14")
+	raw.Description = cmem.String(t, "runtime")
 	raw.NameHash = 0xfeedbeef
 	raw.Mod = int32(DepModGE)
 
@@ -42,15 +42,14 @@ func TestDependencyDecodingPreservesMetadata(t *testing.T) {
 }
 
 func TestPackageBuildDependencyBindings(t *testing.T) {
-	allocator := newABIAllocator(t)
-	dependPtr := allocator.alloc(t, unsafe.Sizeof(alpmDepend{}))
+	dependPtr := cmem.Alloc(t, unsafe.Sizeof(alpmDepend{}))
 	depend := (*alpmDepend)(unsafe.Pointer(dependPtr))
-	depend.Name = allocator.string(t, "cmake")
-	depend.Description = allocator.string(t, "build system")
+	depend.Name = cmem.String(t, "cmake")
+	depend.Description = cmem.String(t, "build system")
 	depend.NameHash = 42
 	depend.Mod = int32(DepModAny)
 
-	nodePtr := allocator.alloc(t, unsafe.Sizeof(abiListNode{}))
+	nodePtr := cmem.Alloc(t, unsafe.Sizeof(abiListNode{}))
 	(*abiListNode)(unsafe.Pointer(nodePtr)).Data = dependPtr
 
 	oldCheck := lib.AlpmPkgGetCheckdepends
@@ -79,11 +78,10 @@ func TestPackageBuildDependencyBindings(t *testing.T) {
 }
 
 func TestConflictDecodingUsesPackageAccessors(t *testing.T) {
-	allocator := newABIAllocator(t)
-	firstPackage := allocator.alloc(t, 1)
-	secondPackage := allocator.alloc(t, 1)
-	firstName := allocator.string(t, "first")
-	secondName := allocator.string(t, "second")
+	firstPackage := cmem.Alloc(t, 1)
+	secondPackage := cmem.Alloc(t, 1)
+	firstName := cmem.String(t, "first")
+	secondName := cmem.String(t, "second")
 
 	oldGetName := lib.AlpmPkgGetName
 	lib.AlpmPkgGetName = func(pkg uintptr) uintptr {
@@ -100,12 +98,12 @@ func TestConflictDecodingUsesPackageAccessors(t *testing.T) {
 		lib.AlpmPkgGetName = oldGetName
 	})
 
-	reasonPtr := allocator.alloc(t, unsafe.Sizeof(alpmDepend{}))
+	reasonPtr := cmem.Alloc(t, unsafe.Sizeof(alpmDepend{}))
 	reason := (*alpmDepend)(unsafe.Pointer(reasonPtr))
-	reason.Name = allocator.string(t, "virtual")
+	reason.Name = cmem.String(t, "virtual")
 	reason.Mod = int32(DepModAny)
 
-	conflictPtr := allocator.alloc(t, unsafe.Sizeof(alpmConflict{}))
+	conflictPtr := cmem.Alloc(t, unsafe.Sizeof(alpmConflict{}))
 	raw := (*alpmConflict)(unsafe.Pointer(conflictPtr))
 	raw.Package1 = firstPackage
 	raw.Package2 = secondPackage
@@ -124,13 +122,12 @@ func TestConflictDecodingUsesPackageAccessors(t *testing.T) {
 }
 
 func TestFileConflictDecoding(t *testing.T) {
-	allocator := newABIAllocator(t)
-	ptr := allocator.alloc(t, unsafe.Sizeof(alpmFileConflict{}))
+	ptr := cmem.Alloc(t, unsafe.Sizeof(alpmFileConflict{}))
 	raw := (*alpmFileConflict)(unsafe.Pointer(ptr))
-	raw.Target = allocator.string(t, "target")
+	raw.Target = cmem.String(t, "target")
 	raw.Type = int32(FileConflictFilesystem)
-	raw.File = allocator.string(t, "usr/bin/tool")
-	raw.CTarget = allocator.string(t, "owner")
+	raw.File = cmem.String(t, "usr/bin/tool")
+	raw.CTarget = cmem.String(t, "owner")
 
 	conflict := newFileConflict(ptr)
 	if conflict.GetTarget() != "target" ||

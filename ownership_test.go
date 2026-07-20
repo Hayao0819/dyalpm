@@ -1,16 +1,14 @@
 package dyalpm
 
 import (
-	"runtime"
 	"testing"
-	"unsafe"
 
 	"github.com/Jguer/dyalpm/internal/lib"
+	"github.com/Jguer/dyalpm/internal/testutil/cmem"
 )
 
 func TestDependencyComputeStringCopiesAndFrees(t *testing.T) {
-	source := []byte{'b', 'a', 's', 'h', 0}
-	sourcePtr := uintptr(unsafe.Pointer(&source[0]))
+	sourcePtr, source := cmem.Bytes(t, []byte{'b', 'a', 's', 'h', 0})
 
 	originalCompute := lib.AlpmDepComputeString
 	originalFree := lib.LibcFree
@@ -29,7 +27,6 @@ func TestDependencyComputeStringCopiesAndFrees(t *testing.T) {
 
 	got := newDependency(1).ComputeString()
 	copy(source, "xxxx")
-	runtime.KeepAlive(source)
 
 	if got != "bash" {
 		t.Fatalf("ComputeString() = %q, want %q", got, "bash")
@@ -40,8 +37,7 @@ func TestDependencyComputeStringCopiesAndFrees(t *testing.T) {
 }
 
 func TestPackageSigCopiesAndFrees(t *testing.T) {
-	source := []byte{1, 2, 3, 4}
-	sourcePtr := uintptr(unsafe.Pointer(&source[0]))
+	sourcePtr, source := cmem.Bytes(t, []byte{1, 2, 3, 4})
 
 	originalGetSig := lib.AlpmPkgGetSig
 	originalFree := lib.LibcFree
@@ -65,7 +61,6 @@ func TestPackageSigCopiesAndFrees(t *testing.T) {
 		t.Fatalf("Sig() error = %v", err)
 	}
 	clear(source)
-	runtime.KeepAlive(source)
 
 	if len(got) != 4 || got[0] != 1 || got[1] != 2 || got[2] != 3 || got[3] != 4 {
 		t.Fatalf("Sig() = %v, want [1 2 3 4]", got)

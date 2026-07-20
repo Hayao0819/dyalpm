@@ -3,9 +3,7 @@
 package dyalpm
 
 import (
-	"runtime"
 	"testing"
-	"unsafe"
 
 	"github.com/ebitengine/purego"
 )
@@ -23,17 +21,10 @@ func loadVercmp() (func(string, string) int, error) {
 		return nil, err
 	}
 
+	var vercmp func(string, string) int32
+	purego.RegisterFunc(&vercmp, vercmpPtr)
 	return func(a, b string) int {
-		aBytes := append([]byte(a), 0)
-		bBytes := append([]byte(b), 0)
-
-		result, _, _ := purego.SyscallN(vercmpPtr,
-			uintptr(unsafe.Pointer(&aBytes[0])),
-			uintptr(unsafe.Pointer(&bBytes[0])))
-		runtime.KeepAlive(aBytes)
-		runtime.KeepAlive(bBytes)
-
-		return int(int32(result)) // signed int
+		return int(vercmp(a, b))
 	}, nil
 }
 

@@ -1,17 +1,16 @@
 package lib
 
 import (
-	"runtime"
 	"testing"
-	"unsafe"
+
+	"github.com/Jguer/dyalpm/internal/testutil/cmem"
 )
 
 func TestPtrToStringCopiesSource(t *testing.T) {
-	source := []byte{'a', 'l', 'p', 'm', 0}
-	got := PtrToString(uintptr(unsafe.Pointer(&source[0])))
+	sourcePtr, source := cmem.Bytes(t, []byte{'a', 'l', 'p', 'm', 0})
+	got := PtrToString(sourcePtr)
 
 	copy(source, "xxxx")
-	runtime.KeepAlive(source)
 
 	if got != "alpm" {
 		t.Fatalf("PtrToString() = %q, want %q", got, "alpm")
@@ -19,11 +18,10 @@ func TestPtrToStringCopiesSource(t *testing.T) {
 }
 
 func TestPtrToStringWithLenCopiesSource(t *testing.T) {
-	source := []byte{'a', 0, 'b'}
-	got := PtrToStringWithLen(uintptr(unsafe.Pointer(&source[0])), len(source))
+	sourcePtr, source := cmem.Bytes(t, []byte{'a', 0, 'b'})
+	got := PtrToStringWithLen(sourcePtr, len(source))
 
 	clear(source)
-	runtime.KeepAlive(source)
 
 	if got != "a\x00b" {
 		t.Fatalf("PtrToStringWithLen() = %q, want %q", got, "a\x00b")
@@ -31,8 +29,8 @@ func TestPtrToStringWithLenCopiesSource(t *testing.T) {
 }
 
 func TestPtrToStringWithLenRejectsInvalidInput(t *testing.T) {
-	value := byte('a')
-	if got := PtrToStringWithLen(uintptr(unsafe.Pointer(&value)), -1); got != "" {
+	value, _ := cmem.Bytes(t, []byte{'a'})
+	if got := PtrToStringWithLen(value, -1); got != "" {
 		t.Fatalf("PtrToStringWithLen() = %q, want empty string", got)
 	}
 	if got := PtrToStringWithLen(0, 1); got != "" {
