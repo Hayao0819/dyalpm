@@ -1,7 +1,7 @@
-package dyerrors
+// Package errors exposes libalpm error codes and contextual errors.
+package errors
 
-// Errno represents an ALPM error code
-type Errno int
+type Errno int32
 
 const (
 	ErrOK Errno = iota
@@ -52,6 +52,7 @@ const (
 	ErrUnsatisfiedDeps
 	ErrConflictingDeps
 	ErrFileConflicts
+	ErrRetrievePrepare
 	ErrRetrieve
 	ErrInvalidRegex
 	ErrLibArchive
@@ -60,11 +61,6 @@ const (
 	ErrGpgme
 	ErrMissingCapabilitySignatures
 )
-
-// Error implements the error interface
-func (e Errno) Error() string {
-	return errnoStrings[e]
-}
 
 var errnoStrings = map[Errno]string{
 	ErrOK:                          "No error",
@@ -115,6 +111,7 @@ var errnoStrings = map[Errno]string{
 	ErrUnsatisfiedDeps:             "Dependencies could not be satisfied",
 	ErrConflictingDeps:             "Conflicting dependencies",
 	ErrFileConflicts:               "Files conflict",
+	ErrRetrievePrepare:             "Download setup failed",
 	ErrRetrieve:                    "Download failed",
 	ErrInvalidRegex:                "Invalid Regex",
 	ErrLibArchive:                  "Error in libarchive",
@@ -124,7 +121,10 @@ var errnoStrings = map[Errno]string{
 	ErrMissingCapabilitySignatures: "Missing compile-time features",
 }
 
-// ALPMError wraps an ALPM error with context
+func (e Errno) Error() string {
+	return errnoStrings[e]
+}
+
 type ALPMError struct {
 	Errno Errno
 	Msg   string
@@ -137,7 +137,10 @@ func (e *ALPMError) Error() string {
 	return e.Errno.Error()
 }
 
-// NewError creates a new ALPMError
+func (e *ALPMError) Unwrap() error {
+	return e.Errno
+}
+
 func NewError(errno Errno, msg string) *ALPMError {
 	return &ALPMError{
 		Errno: errno,

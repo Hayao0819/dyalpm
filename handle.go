@@ -7,7 +7,7 @@ import (
 
 	"github.com/ebitengine/purego"
 
-	"github.com/Jguer/dyalpm/internal/dyerrors"
+	alpmerrors "github.com/Jguer/dyalpm/errors"
 	"github.com/Jguer/dyalpm/internal/lib"
 	alpmlist "github.com/Jguer/dyalpm/internal/list"
 )
@@ -38,10 +38,10 @@ type Handle interface {
 	DBPath() string
 
 	// Errno returns the current error code
-	Errno() dyerrors.Errno
+	Errno() alpmerrors.Errno
 
 	// StrError returns the error string for an error code
-	StrError(errno dyerrors.Errno) string
+	StrError(errno alpmerrors.Errno) string
 
 	// Options
 	SetLogFile(path string) error
@@ -190,9 +190,9 @@ func Initialize(root, dbpath string) (Handle, error) {
 
 	if handlePtr == 0 {
 		if errno != 0 {
-			return nil, dyerrors.NewError(dyerrors.Errno(errno), "failed to initialize ALPM handle")
+			return nil, alpmerrors.NewError(alpmerrors.Errno(errno), "failed to initialize ALPM handle")
 		}
-		return nil, dyerrors.NewError(dyerrors.ErrSystem, "failed to initialize ALPM handle")
+		return nil, alpmerrors.NewError(alpmerrors.ErrSystem, "failed to initialize ALPM handle")
 	}
 
 	return &handle{ptr: handlePtr}, nil
@@ -219,22 +219,22 @@ func (h *handle) Release() error {
 	return nil
 }
 
-func (h *handle) Errno() dyerrors.Errno {
+func (h *handle) Errno() alpmerrors.Errno {
 	if h.ptr == 0 {
-		return dyerrors.ErrHandleNull
+		return alpmerrors.ErrHandleNull
 	}
 	if lib.AlpmErrno == nil {
-		return dyerrors.ErrSystem
+		return alpmerrors.ErrSystem
 	}
-	return dyerrors.Errno(lib.AlpmErrno(h.ptr))
+	return alpmerrors.Errno(lib.AlpmErrno(h.ptr))
 }
 
-func (h *handle) StrError(errno dyerrors.Errno) string {
+func (h *handle) StrError(errno alpmerrors.Errno) string {
 	if lib.AlpmStrerror == nil {
 		return "unknown error"
 	}
 
-	r1 := lib.AlpmStrerror(clampIntToInt32(int(errno)))
+	r1 := lib.AlpmStrerror(int32(errno))
 	if r1 == 0 {
 		return "unknown error"
 	}
@@ -271,7 +271,7 @@ func (h *handle) getLocalDB() (Database, error) {
 	}
 	r1 := lib.AlpmGetLocalDB(h.ptr)
 	if r1 == 0 {
-		return nil, dyerrors.NewError(h.Errno(), "failed to get local database")
+		return nil, alpmerrors.NewError(h.Errno(), "failed to get local database")
 	}
 	return newDatabase(r1, h), nil
 }
@@ -286,8 +286,8 @@ func (h *handle) getSyncDBs() ([]Database, error) {
 	r1 := lib.AlpmGetSyncDBS(h.ptr)
 	if r1 == 0 {
 		errno := h.Errno()
-		if errno != dyerrors.ErrOK {
-			return nil, dyerrors.NewError(errno, "failed to get sync databases")
+		if errno != alpmerrors.ErrOK {
+			return nil, alpmerrors.NewError(errno, "failed to get sync databases")
 		}
 		return []Database{}, nil
 	}
@@ -426,14 +426,14 @@ func (h *handle) RegisterSyncDB(name string, siglevel int) (Database, error) {
 	siglevelInt32 := clampIntToInt32(siglevel)
 	r1 := lib.AlpmRegisterSyncDB(h.ptr, name, siglevelInt32)
 	if r1 == 0 {
-		return nil, dyerrors.NewError(h.Errno(), "failed to register sync database")
+		return nil, alpmerrors.NewError(h.Errno(), "failed to register sync database")
 	}
 	return newDatabase(r1, h), nil
 }
 
 func (h *handle) UnregisterAllSyncDBs() error {
 	if h.ptr == 0 {
-		return dyerrors.ErrHandleNull
+		return alpmerrors.ErrHandleNull
 	}
 	if lib.AlpmUnregisterAllSyncDBs == nil {
 		return stderrors.New("missing function: alpm_unregister_all_syncdbs")
@@ -449,7 +449,7 @@ func (h *handle) UnregisterAllSyncDBs() error {
 
 func (h *handle) LogAction(prefix, message string) error {
 	if h.ptr == 0 {
-		return dyerrors.ErrHandleNull
+		return alpmerrors.ErrHandleNull
 	}
 
 	if lib.AlpmLogactionSym == 0 {
@@ -480,7 +480,7 @@ func (h *handle) LogAction(prefix, message string) error {
 
 func (h *handle) Unlock() error {
 	if h.ptr == 0 {
-		return dyerrors.ErrHandleNull
+		return alpmerrors.ErrHandleNull
 	}
 	if lib.AlpmUnlock == nil {
 		return stderrors.New("missing function: alpm_unlock")
@@ -495,7 +495,7 @@ func (h *handle) Unlock() error {
 
 func (h *handle) FetchPkgURL(url string) (string, error) {
 	if h.ptr == 0 {
-		return "", dyerrors.ErrHandleNull
+		return "", alpmerrors.ErrHandleNull
 	}
 	if lib.AlpmFetchPkgurl == nil {
 		return "", stderrors.New("missing function: alpm_fetch_pkgurl")
@@ -536,7 +536,7 @@ func (h *handle) FetchPkgURL(url string) (string, error) {
 
 func (h *handle) InterruptTransaction() error {
 	if h.ptr == 0 {
-		return dyerrors.ErrHandleNull
+		return alpmerrors.ErrHandleNull
 	}
 	if lib.AlpmTransInterrupt == nil {
 		return stderrors.New("missing function: alpm_trans_interrupt")
@@ -550,7 +550,7 @@ func (h *handle) InterruptTransaction() error {
 
 func (h *handle) SandboxSetupChild(user, dir string, restrictSyscalls bool) error {
 	if h.ptr == 0 {
-		return dyerrors.ErrHandleNull
+		return alpmerrors.ErrHandleNull
 	}
 	if lib.AlpmSandboxSetupChild == nil {
 		return stderrors.New("missing function: alpm_sandbox_setup_child")

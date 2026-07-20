@@ -137,11 +137,25 @@ next operation.
 
 ## Error Handling
 
-Most operations return Go errors directly. The handle also exposes libalpm's
-current error number and message:
+libalpm errors are exposed by `github.com/Jguer/dyalpm/errors`:
 
 ```go
-if errno := handle.Errno(); errno != 0 {
+import (
+	stderrors "errors"
+
+	alpmerrors "github.com/Jguer/dyalpm/errors"
+)
+
+if errno := handle.Errno(); errno != alpmerrors.ErrOK {
 	fmt.Printf("Error: %s\n", handle.StrError(errno))
+}
+
+if stderrors.Is(err, alpmerrors.ErrPkgNotFound) {
+	fmt.Println("Package not found")
+}
+
+var alpmErr *alpmerrors.ALPMError
+if stderrors.As(err, &alpmErr) {
+	fmt.Printf("libalpm error %d: %s\n", alpmErr.Errno, alpmErr)
 }
 ```

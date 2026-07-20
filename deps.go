@@ -4,7 +4,7 @@ import (
 	stderrors "errors"
 	"unsafe"
 
-	"github.com/Jguer/dyalpm/internal/dyerrors"
+	alpmerrors "github.com/Jguer/dyalpm/errors"
 	"github.com/Jguer/dyalpm/internal/lib"
 	alpmlist "github.com/Jguer/dyalpm/internal/list"
 )
@@ -424,7 +424,7 @@ func (f *fileConflict) Free() {
 
 func (h *handle) CheckDeps(pkgs []Package, remPkgs []Package, upgradePkgs []Package, reverseDeps bool) ([]DepMissing, error) {
 	if h.ptr == 0 {
-		return nil, dyerrors.ErrHandleNull
+		return nil, alpmerrors.ErrHandleNull
 	}
 	if lib.AlpmCheckDeps == nil {
 		return nil, stderrors.New("missing function: alpm_checkdeps")
@@ -474,7 +474,7 @@ func (h *handle) CheckDeps(pkgs []Package, remPkgs []Package, upgradePkgs []Pack
 
 func (h *handle) CheckConflicts(pkgs []Package) ([]Conflict, error) {
 	if h.ptr == 0 {
-		return nil, dyerrors.ErrHandleNull
+		return nil, alpmerrors.ErrHandleNull
 	}
 	if lib.AlpmCheckConflicts == nil {
 		return nil, stderrors.New("missing function: alpm_checkconflicts")

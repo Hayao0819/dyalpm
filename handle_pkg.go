@@ -3,13 +3,13 @@ package dyalpm
 import (
 	stderrors "errors"
 
-	"github.com/Jguer/dyalpm/internal/dyerrors"
+	alpmerrors "github.com/Jguer/dyalpm/errors"
 	"github.com/Jguer/dyalpm/internal/lib"
 )
 
 func (h *handle) LoadPackage(filename string, full bool, siglevel int) (Package, error) {
 	if h.ptr == 0 {
-		return nil, dyerrors.ErrHandleNull
+		return nil, alpmerrors.ErrHandleNull
 	}
 
 	if lib.AlpmPkgLoad == nil {
@@ -25,7 +25,7 @@ func (h *handle) LoadPackage(filename string, full bool, siglevel int) (Package,
 	result := lib.AlpmPkgLoad(h.ptr, filename, fullInt, siglevelInt32, &pkgPtr)
 
 	if result != 0 {
-		return nil, dyerrors.NewError(h.Errno(), "failed to load package")
+		return nil, alpmerrors.NewError(h.Errno(), "failed to load package")
 	}
 
 	if pkgPtr == 0 {
