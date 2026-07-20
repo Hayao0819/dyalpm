@@ -29,7 +29,7 @@ func Capabilities() (CapabilitiesMask, error) {
 }
 
 // CapabilitiesMask represents the library capabilities bitmask
-type CapabilitiesMask uint64
+type CapabilitiesMask int32
 
 const (
 	CapNLS        CapabilitiesMask = 1 << 0

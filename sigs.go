@@ -129,7 +129,7 @@ func (h *handle) SigListCleanup(siglistPtr uintptr) error {
 		return stderrors.New("missing function: alpm_siglist_cleanup")
 	}
 
-	if lib.AlpmSiglistCleanup(siglistPtr, h.ptr) != 0 {
+	if lib.AlpmSiglistCleanup(siglistPtr) != 0 {
 		return stderrors.New("failed to clean up signature list")
 	}
 	return nil

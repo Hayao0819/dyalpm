@@ -110,6 +110,10 @@ type Handle interface {
 	SetSandboxUser(user string) error
 	SandboxUser() string
 	SetDisableDLTimeout(disable bool) error
+	DisableSandboxFilesystem() bool
+	SetDisableSandboxFilesystem(disable bool) error
+	DisableSandboxSyscalls() bool
+	SetDisableSandboxSyscalls(disable bool) error
 	SetDisableSandbox(disable bool) error
 
 	// LoadPackage loads a package from a file
@@ -125,7 +129,7 @@ type Handle interface {
 	FindGroupPkgs(dbs []Database, name string) ([]Package, error)
 	ExtractKeyID(identifier string, sig []byte) ([]string, error)
 	InterruptTransaction() error
-	SandboxSetupChild(user, dir string) error
+	SandboxSetupChild(user, dir string, restrictSyscalls bool) error
 
 	// Assume Installed
 	AssumeInstalled() ([]Dependency, error)
@@ -546,14 +550,14 @@ func (h *handle) InterruptTransaction() error {
 	return nil
 }
 
-func (h *handle) SandboxSetupChild(user, dir string) error {
+func (h *handle) SandboxSetupChild(user, dir string, restrictSyscalls bool) error {
 	if h.ptr == 0 {
 		return dyerrors.ErrHandleNull
 	}
 	if lib.AlpmSandboxSetupChild == nil {
 		return stderrors.New("missing function: alpm_sandbox_setup_child")
 	}
-	if lib.AlpmSandboxSetupChild(h.ptr, user, dir) != 0 {
+	if lib.AlpmSandboxSetupChild(h.ptr, user, dir, restrictSyscalls) != 0 {
 		return stderrors.New("failed to setup sandbox child")
 	}
 

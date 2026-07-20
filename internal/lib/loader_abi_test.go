@@ -1,6 +1,26 @@
 package lib
 
-import "testing"
+import (
+	"runtime"
+	"testing"
+	"unsafe"
+)
+
+func TestAlpmFuncSignatures(t *testing.T) {
+	var _ func() int32 = AlpmCapabilities
+	var _ func(uintptr) uintptr = AlpmListCount
+	var _ func(uintptr) int32 = AlpmSiglistCleanup
+	var _ func(uintptr, string, uintptr, uintptr, *uintptr) int32 = AlpmExtractKeyID
+	var _ func(uintptr) int64 = AlpmPkgGetBuildDate
+	var _ func(uintptr) int64 = AlpmPkgGetInstallDate
+	var _ func(uintptr, string, string, bool) int32 = AlpmSandboxSetupChild
+	var _ func(uintptr, string) uintptr = AlpmPkgGetFilesContains
+	var _ func(uintptr, uintptr) int32 = AlpmPkgChangelogClose
+	var _ func(uintptr) = AlpmDepFree
+	var _ func(uintptr) = AlpmDepmissingFree
+	var _ func(uintptr) = AlpmConflictFree
+	var _ func(uintptr) = AlpmFileConflictFree
+}
 
 func TestAlpmFuncResolution(t *testing.T) {
 	if err := EnsureAlpmLoaded(); err != nil {
@@ -71,4 +91,56 @@ func TestAlpmFuncResolution(t *testing.T) {
 			t.Logf("alpm_capabilities returned zero bitmask")
 		}
 	}
+}
+
+func TestAlpmListCountABI(t *testing.T) {
+	if err := EnsureAlpmLoaded(); err != nil {
+		t.Skipf("libalpm not available: %v", err)
+	}
+	if AlpmListAdd == nil || AlpmListCount == nil || AlpmListFree == nil {
+		t.Fatal("required alpm list functions did not resolve")
+	}
+
+	var list uintptr
+	for _, value := range []uintptr{1, 2, 3, 4} {
+		list = AlpmListAdd(list, value)
+		if list == 0 {
+			t.Fatal("alpm_list_add returned nil")
+		}
+	}
+	defer AlpmListFree(list)
+
+	if got := AlpmListCount(list); got != 4 {
+		t.Fatalf("alpm_list_count returned %d, want 4", got)
+	}
+}
+
+func TestAlpmSiglistCleanupABI(t *testing.T) {
+	if err := EnsureAlpmLoaded(); err != nil {
+		t.Skipf("libalpm not available: %v", err)
+	}
+	if AlpmSiglistCleanup == nil {
+		t.Fatal("alpm_siglist_cleanup did not resolve")
+	}
+
+	siglist := [2]uintptr{}
+	if result := AlpmSiglistCleanup(uintptr(unsafe.Pointer(&siglist[0]))); result != 0 {
+		t.Fatalf("alpm_siglist_cleanup returned %d", result)
+	}
+	runtime.KeepAlive(siglist)
+}
+
+func TestAlpmVoidFreeABI(t *testing.T) {
+	if err := EnsureAlpmLoaded(); err != nil {
+		t.Skipf("libalpm not available: %v", err)
+	}
+	if AlpmDepFromString == nil || AlpmDepFree == nil {
+		t.Fatal("dependency functions did not resolve")
+	}
+
+	dep := AlpmDepFromString("bash>=5")
+	if dep == 0 {
+		t.Fatal("alpm_dep_from_string returned nil")
+	}
+	AlpmDepFree(dep)
 }

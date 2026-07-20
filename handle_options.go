@@ -228,12 +228,68 @@ func (h *handle) SetDisableDLTimeout(disable bool) error {
 	return h.setOptionInt("alpm_option_set_disable_dl_timeout", value)
 }
 
-func (h *handle) SetDisableSandbox(disable bool) error {
-	value := 0
+func (h *handle) DisableSandboxFilesystem() bool {
+	if h.ptr == 0 || lib.AlpmOptionGetDisableSandboxFilesystem == nil {
+		return false
+	}
+	return lib.AlpmOptionGetDisableSandboxFilesystem(h.ptr) != 0
+}
+
+func (h *handle) SetDisableSandboxFilesystem(disable bool) error {
+	if h.ptr == 0 {
+		return dyerrors.ErrHandleNull
+	}
+	if lib.AlpmOptionSetDisableSandboxFilesystem == nil {
+		return errors.New("function unavailable: alpm_option_set_disable_sandbox_filesystem")
+	}
+
+	var value uint16
 	if disable {
 		value = 1
 	}
-	return h.setOptionInt("alpm_option_set_disable_sandbox", value)
+	if lib.AlpmOptionSetDisableSandboxFilesystem(h.ptr, value) != 0 {
+		return dyerrors.NewError(h.Errno(), "failed to set option")
+	}
+	return nil
+}
+
+func (h *handle) DisableSandboxSyscalls() bool {
+	if h.ptr == 0 || lib.AlpmOptionGetDisableSandboxSyscalls == nil {
+		return false
+	}
+	return lib.AlpmOptionGetDisableSandboxSyscalls(h.ptr) != 0
+}
+
+func (h *handle) SetDisableSandboxSyscalls(disable bool) error {
+	if h.ptr == 0 {
+		return dyerrors.ErrHandleNull
+	}
+	if lib.AlpmOptionSetDisableSandboxSyscalls == nil {
+		return errors.New("function unavailable: alpm_option_set_disable_sandbox_syscalls")
+	}
+
+	var value uint16
+	if disable {
+		value = 1
+	}
+	if lib.AlpmOptionSetDisableSandboxSyscalls(h.ptr, value) != 0 {
+		return dyerrors.NewError(h.Errno(), "failed to set option")
+	}
+	return nil
+}
+
+func (h *handle) SetDisableSandbox(disable bool) error {
+	originalFilesystem := h.DisableSandboxFilesystem()
+	originalSyscalls := h.DisableSandboxSyscalls()
+	if err := h.SetDisableSandboxFilesystem(disable); err != nil {
+		return err
+	}
+	if err := h.SetDisableSandboxSyscalls(disable); err != nil {
+		_ = h.SetDisableSandboxFilesystem(originalFilesystem)
+		_ = h.SetDisableSandboxSyscalls(originalSyscalls)
+		return err
+	}
+	return nil
 }
 
 func (h *handle) AssumeInstalled() ([]Dependency, error) {
@@ -551,11 +607,6 @@ func (h *handle) setOptionInt(funcName string, value int) error {
 			return errors.New("function unavailable: alpm_option_set_disable_dl_timeout")
 		}
 		result = lib.AlpmOptionSetDisableDlTimeout(h.ptr, valueInt32)
-	case "alpm_option_set_disable_sandbox":
-		if lib.AlpmOptionSetDisableSandbox == nil {
-			return errors.New("function unavailable: alpm_option_set_disable_sandbox")
-		}
-		result = lib.AlpmOptionSetDisableSandbox(h.ptr, valueInt32)
 	default:
 		return errors.New("unsupported function: " + funcName)
 	}

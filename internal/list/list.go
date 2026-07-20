@@ -92,13 +92,12 @@ func (it *Iterator) Next() uintptr {
 }
 
 // Count returns the number of items in the list
-func (l *List) Count() int {
+func (l *List) Count() uintptr {
 	if l == nil || l.ptr == 0 {
 		return 0
 	}
-	var result uintptr
 	if lib.AlpmListCount == nil {
-		count := 0
+		var count uintptr
 		current := l
 		for current != nil && current.ptr != 0 {
 			count++
@@ -106,8 +105,7 @@ func (l *List) Count() int {
 		}
 		return count
 	}
-	lib.AlpmListCount(l.ptr, &result)
-	return int(result)
+	return lib.AlpmListCount(l.ptr)
 }
 
 // ToSlice converts the list to a Go slice of pointers
