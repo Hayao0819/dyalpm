@@ -5,7 +5,7 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/Jguer/dyalpm/internal/dyerrors"
+	alpmerrors "github.com/Jguer/dyalpm/errors"
 	"github.com/Jguer/dyalpm/internal/lib"
 )
 
@@ -76,22 +76,19 @@ func installTransactionBindings(t *testing.T) *transactionFreeLog {
 	lib.LibcFree = func(ptr uintptr) {
 		log.strings = append(log.strings, ptr)
 	}
-	lib.AlpmDepmissingFree = func(ptr uintptr) int32 {
+	lib.AlpmDepmissingFree = func(ptr uintptr) {
 		log.missing = append(log.missing, ptr)
-		return 0
 	}
-	lib.AlpmConflictFree = func(ptr uintptr) int32 {
+	lib.AlpmConflictFree = func(ptr uintptr) {
 		log.conflicts = append(log.conflicts, ptr)
-		return 0
 	}
-	lib.AlpmFileConflictFree = func(ptr uintptr) int32 {
+	lib.AlpmFileConflictFree = func(ptr uintptr) {
 		log.fileConflicts = append(log.fileConflicts, ptr)
-		return 0
 	}
 	return log
 }
 
-func stubPrepare(t *testing.T, list uintptr, errno dyerrors.Errno) {
+func stubPrepare(t *testing.T, list uintptr, errno alpmerrors.Errno) {
 	t.Helper()
 	lib.AlpmTransPrepare = func(_ uintptr, data *uintptr) int32 {
 		*data = list
@@ -102,7 +99,7 @@ func stubPrepare(t *testing.T, list uintptr, errno dyerrors.Errno) {
 	}
 }
 
-func stubCommit(t *testing.T, list uintptr, errno dyerrors.Errno) {
+func stubCommit(t *testing.T, list uintptr, errno alpmerrors.Errno) {
 	t.Helper()
 	lib.AlpmTransCommit = func(_ uintptr, data *uintptr) int32 {
 		*data = list

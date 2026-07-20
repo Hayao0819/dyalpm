@@ -4,20 +4,20 @@ import (
 	"strings"
 	"unsafe"
 
-	"github.com/Jguer/dyalpm/internal/dyerrors"
+	alpmerrors "github.com/Jguer/dyalpm/errors"
 	"github.com/Jguer/dyalpm/internal/lib"
 	alpmlist "github.com/Jguer/dyalpm/internal/list"
 )
 
 func decodePrepareDiagnostics(
-	errno dyerrors.Errno,
+	errno alpmerrors.Errno,
 	data *alpmlist.List,
 ) TransactionDiagnostics {
 	var diagnostics TransactionDiagnostics
 	switch errno {
-	case dyerrors.ErrPkgInvalidArch:
+	case alpmerrors.ErrPkgInvalidArch:
 		diagnostics.InvalidArchitecture = copyAndFreeStrings(data)
-	case dyerrors.ErrUnsatisfiedDeps:
+	case alpmerrors.ErrUnsatisfiedDeps:
 		forEachData(data, func(ptr uintptr) {
 			diagnostics.MissingDependencies = append(
 				diagnostics.MissingDependencies,
@@ -27,7 +27,7 @@ func decodePrepareDiagnostics(
 				lib.AlpmDepmissingFree(ptr)
 			}
 		})
-	case dyerrors.ErrConflictingDeps:
+	case alpmerrors.ErrConflictingDeps:
 		forEachData(data, func(ptr uintptr) {
 			diagnostics.PackageConflicts = append(
 				diagnostics.PackageConflicts,
@@ -42,12 +42,12 @@ func decodePrepareDiagnostics(
 }
 
 func decodeCommitDiagnostics(
-	errno dyerrors.Errno,
+	errno alpmerrors.Errno,
 	data *alpmlist.List,
 ) TransactionDiagnostics {
 	var diagnostics TransactionDiagnostics
 	switch errno {
-	case dyerrors.ErrFileConflicts:
+	case alpmerrors.ErrFileConflicts:
 		forEachData(data, func(ptr uintptr) {
 			diagnostics.FileConflicts = append(
 				diagnostics.FileConflicts,
@@ -57,9 +57,9 @@ func decodeCommitDiagnostics(
 				lib.AlpmFileConflictFree(ptr)
 			}
 		})
-	case dyerrors.ErrPkgInvalid,
-		dyerrors.ErrPkgInvalidChecksum,
-		dyerrors.ErrPkgInvalidSig:
+	case alpmerrors.ErrPkgInvalid,
+		alpmerrors.ErrPkgInvalidChecksum,
+		alpmerrors.ErrPkgInvalidSig:
 		diagnostics.InvalidPackageFiles = copyAndFreeStrings(data)
 	}
 	return diagnostics

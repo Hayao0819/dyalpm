@@ -179,7 +179,7 @@ func TestQuestionSelectProviderDecodesPayload(t *testing.T) {
 
 	h := &handle{ptr: 1}
 	providers := question.Providers(h)
-	if providers.freeOnDone {
+	if providers.state == nil || providers.state.owned {
 		t.Fatal("provider list must remain owned by libalpm")
 	}
 	packages := providers.Collect()

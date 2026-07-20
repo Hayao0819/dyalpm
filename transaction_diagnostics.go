@@ -1,6 +1,6 @@
 package dyalpm
 
-import "github.com/Jguer/dyalpm/internal/dyerrors"
+import alpmerrors "github.com/Jguer/dyalpm/errors"
 
 type TransactionOperation string
 
@@ -148,7 +148,7 @@ func (dependencyValue) Free() {}
 
 func newTransactionError(
 	operation TransactionOperation,
-	errno dyerrors.Errno,
+	errno alpmerrors.Errno,
 	diagnostics TransactionDiagnostics,
 ) *TransactionError {
 	sentinel := ErrTransactionPrepareFailed
@@ -158,7 +158,7 @@ func newTransactionError(
 	return &TransactionError{
 		Operation:   operation,
 		Diagnostics: diagnostics,
-		Cause:       dyerrors.NewError(errno, ""),
+		Cause:       alpmerrors.NewError(errno, ""),
 		sentinel:    sentinel,
 	}
 }

@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/Jguer/dyalpm/internal/dyerrors"
+	alpmerrors "github.com/Jguer/dyalpm/errors"
 	"github.com/Jguer/dyalpm/internal/lib"
 )
 
@@ -32,7 +32,7 @@ func TestTransactionPrepareDiagnostics(t *testing.T) {
 		missingPtr := transactionPinnedPointer(&pinner, missing)
 		list := &transactionTestList{data: missingPtr}
 		listPtr := transactionPinnedPointer(&pinner, list)
-		stubPrepare(t, listPtr, dyerrors.ErrUnsatisfiedDeps)
+		stubPrepare(t, listPtr, alpmerrors.ErrUnsatisfiedDeps)
 
 		values, err := (&transaction{handle: &handle{ptr: 1}}).Prepare()
 		var transactionErr *TransactionError
@@ -79,7 +79,7 @@ func TestTransactionPrepareDiagnostics(t *testing.T) {
 		name, namePtr := transactionCString(&pinner, "foreign-1.pkg.tar.zst")
 		list := &transactionTestList{data: namePtr}
 		listPtr := transactionPinnedPointer(&pinner, list)
-		stubPrepare(t, listPtr, dyerrors.ErrPkgInvalidArch)
+		stubPrepare(t, listPtr, alpmerrors.ErrPkgInvalidArch)
 
 		values, err := (&transaction{handle: &handle{ptr: 1}}).Prepare()
 		var transactionErr *TransactionError
@@ -131,7 +131,7 @@ func TestTransactionPrepareDiagnostics(t *testing.T) {
 				return 0
 			}
 		}
-		stubPrepare(t, listPtr, dyerrors.ErrConflictingDeps)
+		stubPrepare(t, listPtr, alpmerrors.ErrConflictingDeps)
 
 		_, err := (&transaction{handle: &handle{ptr: 1}}).Prepare()
 		var transactionErr *TransactionError

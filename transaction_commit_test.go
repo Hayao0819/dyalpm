@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/Jguer/dyalpm/internal/dyerrors"
+	alpmerrors "github.com/Jguer/dyalpm/errors"
 )
 
 func TestTransactionCommitDiagnostics(t *testing.T) {
@@ -25,7 +25,7 @@ func TestTransactionCommitDiagnostics(t *testing.T) {
 		conflictPtr := transactionPinnedPointer(&pinner, conflict)
 		list := &transactionTestList{data: conflictPtr}
 		listPtr := transactionPinnedPointer(&pinner, list)
-		stubCommit(t, listPtr, dyerrors.ErrFileConflicts)
+		stubCommit(t, listPtr, alpmerrors.ErrFileConflicts)
 
 		values, err := (&transaction{handle: &handle{ptr: 1}}).Commit()
 		var transactionErr *TransactionError
@@ -64,7 +64,7 @@ func TestTransactionCommitDiagnostics(t *testing.T) {
 		name, namePtr := transactionCString(&pinner, "broken.pkg.tar.zst")
 		list := &transactionTestList{data: namePtr}
 		listPtr := transactionPinnedPointer(&pinner, list)
-		stubCommit(t, listPtr, dyerrors.ErrPkgInvalidSig)
+		stubCommit(t, listPtr, alpmerrors.ErrPkgInvalidSig)
 
 		values, err := (&transaction{handle: &handle{ptr: 1}}).Commit()
 		var transactionErr *TransactionError

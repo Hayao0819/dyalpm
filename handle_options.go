@@ -237,7 +237,7 @@ func (h *handle) DisableSandboxFilesystem() bool {
 
 func (h *handle) SetDisableSandboxFilesystem(disable bool) error {
 	if h.ptr == 0 {
-		return dyerrors.ErrHandleNull
+		return alpmerrors.ErrHandleNull
 	}
 	if lib.AlpmOptionSetDisableSandboxFilesystem == nil {
 		return errors.New("function unavailable: alpm_option_set_disable_sandbox_filesystem")
@@ -248,7 +248,7 @@ func (h *handle) SetDisableSandboxFilesystem(disable bool) error {
 		value = 1
 	}
 	if lib.AlpmOptionSetDisableSandboxFilesystem(h.ptr, value) != 0 {
-		return dyerrors.NewError(h.Errno(), "failed to set option")
+		return alpmerrors.NewError(h.Errno(), "failed to set option")
 	}
 	return nil
 }
@@ -262,7 +262,7 @@ func (h *handle) DisableSandboxSyscalls() bool {
 
 func (h *handle) SetDisableSandboxSyscalls(disable bool) error {
 	if h.ptr == 0 {
-		return dyerrors.ErrHandleNull
+		return alpmerrors.ErrHandleNull
 	}
 	if lib.AlpmOptionSetDisableSandboxSyscalls == nil {
 		return errors.New("function unavailable: alpm_option_set_disable_sandbox_syscalls")
@@ -273,7 +273,7 @@ func (h *handle) SetDisableSandboxSyscalls(disable bool) error {
 		value = 1
 	}
 	if lib.AlpmOptionSetDisableSandboxSyscalls(h.ptr, value) != 0 {
-		return dyerrors.NewError(h.Errno(), "failed to set option")
+		return alpmerrors.NewError(h.Errno(), "failed to set option")
 	}
 	return nil
 }

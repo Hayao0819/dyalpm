@@ -3,7 +3,7 @@ package dyalpm
 import (
 	stderrors "errors"
 
-	"github.com/Jguer/dyalpm/internal/dyerrors"
+	alpmerrors "github.com/Jguer/dyalpm/errors"
 	"github.com/Jguer/dyalpm/internal/lib"
 	alpmlist "github.com/Jguer/dyalpm/internal/list"
 )
@@ -67,7 +67,7 @@ type transaction struct {
 	handle *handle
 }
 
-func (t *transaction) call(funcName string) (*alpmlist.List, dyerrors.Errno, bool, error) {
+func (t *transaction) call(funcName string) (*alpmlist.List, alpmerrors.Errno, bool, error) {
 	var fn func(uintptr, *uintptr) int32
 	switch funcName {
 	case "alpm_trans_prepare":
@@ -75,18 +75,18 @@ func (t *transaction) call(funcName string) (*alpmlist.List, dyerrors.Errno, boo
 	case "alpm_trans_commit":
 		fn = lib.AlpmTransCommit
 	default:
-		return nil, dyerrors.ErrOK, false, stderrors.New("missing function: " + funcName)
+		return nil, alpmerrors.ErrOK, false, stderrors.New("missing function: " + funcName)
 	}
 
 	if fn == nil {
-		return nil, dyerrors.ErrOK, false, stderrors.New("missing function: " + funcName)
+		return nil, alpmerrors.ErrOK, false, stderrors.New("missing function: " + funcName)
 	}
 
 	var dataListPtr uintptr
 	result := fn(t.handle.ptr, &dataListPtr)
 	alpmList := alpmlist.NewList(dataListPtr)
 	if result == 0 {
-		return alpmList, dyerrors.ErrOK, false, nil
+		return alpmList, alpmerrors.ErrOK, false, nil
 	}
 	return alpmList, t.handle.Errno(), true, nil
 }
