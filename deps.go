@@ -441,6 +441,12 @@ func (h *handle) CheckConflicts(pkgs []Package) ([]Conflict, error) {
 
 // FindSatisfier finds a package that satisfies a dependency in a list of packages
 func FindSatisfier(pkgs []Package, depstring string) Package {
+	if len(pkgs) == 0 {
+		return nil
+	}
+	if err := lib.EnsureAlpmLoaded(); err != nil {
+		return nil
+	}
 	if lib.AlpmFindSatisfier == nil {
 		return nil
 	}

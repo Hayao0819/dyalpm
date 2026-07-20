@@ -10,26 +10,12 @@ import (
 	"github.com/ebitengine/purego"
 )
 
-// Integration test that dynamically loads alpm_pkg_vercmp from libalpm
-// and compares the output against our pure Go implementation.
-//
-// Run with: go test -tags=integration -v -run TestVerCmp_Integration
+const libalpmPath = "libalpm.so.16"
 
-const (
-	libalpmPath         = "libalpm.so.16"
-	libalpmPathFallback = "libalpm.so"
-)
-
-// loadVercmp loads alpm_pkg_vercmp from libalpm.so
 func loadVercmp() (func(string, string) int, error) {
-	// Try primary path first
 	lib, err := purego.Dlopen(libalpmPath, purego.RTLD_NOW|purego.RTLD_GLOBAL)
 	if err != nil {
-		// Try fallback path
-		lib, err = purego.Dlopen(libalpmPathFallback, purego.RTLD_NOW|purego.RTLD_GLOBAL)
-		if err != nil {
-			return nil, err
-		}
+		return nil, err
 	}
 
 	vercmpPtr, err := purego.Dlsym(lib, "alpm_pkg_vercmp")
