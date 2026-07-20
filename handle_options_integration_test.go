@@ -103,6 +103,41 @@ func TestHandleOptions_BoolAndIntRoundTrip(t *testing.T) {
 	if got := h.ParallelDownloads(); got != 8 {
 		t.Fatalf("parallel downloads mismatch: got %d, want %d", got, 8)
 	}
+
+	originalFilesystem := h.DisableSandboxFilesystem()
+	originalSyscalls := h.DisableSandboxSyscalls()
+	t.Cleanup(func() {
+		_ = h.SetDisableSandboxFilesystem(originalFilesystem)
+		_ = h.SetDisableSandboxSyscalls(originalSyscalls)
+	})
+
+	if err := h.SetDisableSandboxFilesystem(!originalFilesystem); err != nil {
+		t.Fatalf("failed to set filesystem sandbox state: %v", err)
+	}
+	if got := h.DisableSandboxFilesystem(); got != !originalFilesystem {
+		t.Fatalf("filesystem sandbox mismatch: got %v, want %v", got, !originalFilesystem)
+	}
+
+	if err := h.SetDisableSandboxSyscalls(!originalSyscalls); err != nil {
+		t.Fatalf("failed to set syscall sandbox state: %v", err)
+	}
+	if got := h.DisableSandboxSyscalls(); got != !originalSyscalls {
+		t.Fatalf("syscall sandbox mismatch: got %v, want %v", got, !originalSyscalls)
+	}
+
+	if err := h.SetDisableSandbox(true); err != nil {
+		t.Fatalf("failed to disable sandbox: %v", err)
+	}
+	if !h.DisableSandboxFilesystem() || !h.DisableSandboxSyscalls() {
+		t.Fatal("SetDisableSandbox(true) did not disable both sandbox components")
+	}
+
+	if err := h.SetDisableSandbox(false); err != nil {
+		t.Fatalf("failed to enable sandbox: %v", err)
+	}
+	if h.DisableSandboxFilesystem() || h.DisableSandboxSyscalls() {
+		t.Fatal("SetDisableSandbox(false) did not enable both sandbox components")
+	}
 }
 
 func TestHandleOptions_ListRoundTrip(t *testing.T) {

@@ -2,7 +2,7 @@ package lib
 
 var (
 	AlpmVersion      func() uintptr
-	AlpmCapabilities func() uint64
+	AlpmCapabilities func() int32
 	AlpmErrno        func(handle uintptr) int32
 	AlpmStrerror     func(errno int32) uintptr
 	AlpmRelease      func(handle uintptr) int32
@@ -51,7 +51,6 @@ var (
 	AlpmOptionSetSandboxuser        func(handle uintptr, user string) int32
 	AlpmOptionGetSandboxuser        func(handle uintptr) uintptr
 	AlpmOptionSetDisableDlTimeout   func(handle uintptr, value int32) int32
-	AlpmOptionSetDisableSandbox     func(handle uintptr, value int32) int32
 	AlpmOptionSetArchitectures      func(handle uintptr, list uintptr) int32
 	AlpmOptionGetArchitectures      func(handle uintptr) uintptr
 	AlpmOptionAddCachedir           func(handle uintptr, path string) int32
@@ -112,7 +111,7 @@ var (
 	AlpmTransInterrupt       func(handle uintptr) int32
 	AlpmUnlock               func(handle uintptr) int32
 	AlpmFindGroupPkgs        func(list uintptr, name string) uintptr
-	AlpmSandboxSetupChild    func(handle uintptr, user string, dir string) int32
+	AlpmSandboxSetupChild    func(handle uintptr, user string, dir string, restrictSyscalls bool) int32
 
 	AlpmLogactionSym uintptr
 
@@ -142,17 +141,17 @@ var (
 
 	AlpmDepComputeString func(dep uintptr) uintptr
 	AlpmDepFromString    func(text string) uintptr
-	AlpmDepFree          func(dep uintptr) int32
-	AlpmDepmissingFree   func(ptr uintptr) int32
-	AlpmConflictFree     func(ptr uintptr) int32
-	AlpmFileConflictFree func(ptr uintptr) int32
+	AlpmDepFree          func(dep uintptr)
+	AlpmDepmissingFree   func(ptr uintptr)
+	AlpmConflictFree     func(ptr uintptr)
+	AlpmFileConflictFree func(ptr uintptr)
 	AlpmCheckDeps        func(handle uintptr, pkgList uintptr, remPkgList uintptr, upgradePkgList uintptr, reverse int32) uintptr
 	AlpmCheckConflicts   func(handle uintptr, pkgList uintptr) uintptr
 	AlpmFindSatisfier    func(pkgs uintptr, dep string) uintptr
 	AlpmFindDBSatisfier  func(handle uintptr, dbList uintptr, dep string) uintptr
 	AlpmComputeMd5sum    func(filename string) uintptr
 	AlpmComputeSha256sum func(filename string) uintptr
-	AlpmExtractKeyID     func(handle uintptr, identifier string, sig uintptr, sigLen int32, keys *uintptr) int32
+	AlpmExtractKeyID     func(handle uintptr, identifier string, sig uintptr, sigLen uintptr, keys *uintptr) int32
 
 	AlpmPkgFind               func(list uintptr, name string) uintptr
 	AlpmPkgGetName            func(pkg uintptr) uintptr
@@ -181,8 +180,8 @@ var (
 	AlpmPkgDownloadSize       func(pkg uintptr) int64
 	AlpmPkgGetBackup          func(pkg uintptr) uintptr
 	AlpmPkgGetFiles           func(pkg uintptr) uintptr
-	AlpmPkgGetInstallDate     func(pkg uintptr) int32
-	AlpmPkgGetBuildDate       func(pkg uintptr) int32
+	AlpmPkgGetInstallDate     func(pkg uintptr) int64
+	AlpmPkgGetBuildDate       func(pkg uintptr) int64
 	AlpmPkgGetHandle          func(pkg uintptr) uintptr
 	AlpmPkgShouldIgnore       func(handle uintptr, pkg uintptr) int32
 	AlpmPkgCheckmd5sum        func(pkg uintptr) int32
@@ -190,22 +189,29 @@ var (
 	AlpmPkgGetBase64Sig       func(pkg uintptr) uintptr
 	AlpmPkgChangelogOpen      func(pkg uintptr) uintptr
 	AlpmPkgChangelogRead      func(buf uintptr, size uintptr, pkg uintptr, fp uintptr) int
-	AlpmPkgChangelogClose     func(pkg uintptr, fp uintptr)
+	AlpmPkgChangelogClose     func(pkg uintptr, fp uintptr) int32
 	AlpmPkgSyncGetNewVersion  func(pkg uintptr, dbList uintptr) uintptr
-	AlpmPkgGetFilesContains   func(fileList uintptr, path string) int32
+	AlpmPkgGetFilesContains   func(fileList uintptr, path string) uintptr
 	AlpmPkgFree               func(pkg uintptr) int32
 	AlpmPkgGetXdata           func(pkg uintptr) uintptr
 	AlpmPkgComputeRequiredBy  func(pkg uintptr) uintptr
 	AlpmPkgComputeOptionalFor func(pkg uintptr) uintptr
 	AlpmPkgLoad               func(handle uintptr, filename string, full int32, siglevel int32, pkg *uintptr) int32
 
-	AlpmSiglistCleanup func(listPtr uintptr, handle uintptr) int32
+	AlpmSiglistCleanup func(listPtr uintptr) int32
 
 	AlpmListAdd   func(list uintptr, data uintptr) uintptr
-	AlpmListCount func(list uintptr, result *uintptr) int32
+	AlpmListCount func(list uintptr) uintptr
 	AlpmListFree  func(list uintptr)
 
 	AlpmSetLockFile func(handle uintptr, path string) int32
+)
+
+var (
+	AlpmOptionGetDisableSandboxFilesystem func(handle uintptr) int32
+	AlpmOptionSetDisableSandboxFilesystem func(handle uintptr, value uint16) int32
+	AlpmOptionGetDisableSandboxSyscalls   func(handle uintptr) int32
+	AlpmOptionSetDisableSandboxSyscalls   func(handle uintptr, value uint16) int32
 )
 
 func registerAlpmFuncs(library uintptr) {
@@ -259,7 +265,10 @@ func registerAlpmFuncs(library uintptr) {
 	tryRegister(&AlpmOptionSetSandboxuser, library, "alpm_option_set_sandboxuser")
 	tryRegister(&AlpmOptionGetSandboxuser, library, "alpm_option_get_sandboxuser")
 	tryRegister(&AlpmOptionSetDisableDlTimeout, library, "alpm_option_set_disable_dl_timeout")
-	tryRegister(&AlpmOptionSetDisableSandbox, library, "alpm_option_set_disable_sandbox")
+	tryRegister(&AlpmOptionGetDisableSandboxFilesystem, library, "alpm_option_get_disable_sandbox_filesystem")
+	tryRegister(&AlpmOptionSetDisableSandboxFilesystem, library, "alpm_option_set_disable_sandbox_filesystem")
+	tryRegister(&AlpmOptionGetDisableSandboxSyscalls, library, "alpm_option_get_disable_sandbox_syscalls")
+	tryRegister(&AlpmOptionSetDisableSandboxSyscalls, library, "alpm_option_set_disable_sandbox_syscalls")
 	tryRegister(&AlpmOptionSetArchitectures, library, "alpm_option_set_architectures")
 	tryRegister(&AlpmOptionGetArchitectures, library, "alpm_option_get_architectures")
 	tryRegister(&AlpmOptionAddCachedir, library, "alpm_option_add_cachedir")

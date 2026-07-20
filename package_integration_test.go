@@ -5,6 +5,7 @@ package dyalpm
 import (
 	"io"
 	"testing"
+	"time"
 )
 
 func TestPackage_MetadataAndFileAccess(t *testing.T) {
@@ -60,6 +61,9 @@ func TestPackage_MetadataAndFileAccess(t *testing.T) {
 	firstFile := files[0].Name()
 	if !pkgImpl.Contains(firstFile) {
 		t.Fatalf("package does not contain expected file: %s", firstFile)
+	}
+	if pkgImpl.Contains("/__dyalpm_missing_file__") {
+		t.Fatal("package unexpectedly contains missing file")
 	}
 	if fileInfo, err := pkgImpl.ContainsFile(firstFile); err != nil {
 		t.Fatalf("ContainsFile(%q) failed: %v", firstFile, err)
@@ -133,8 +137,14 @@ func TestPackage_MoreValueMethods(t *testing.T) {
 		_ = b.Name()
 		_ = b.Hash()
 	}
-	_ = pkgImpl.BuildDate()
-	_ = pkgImpl.InstallDate()
+	buildDate := pkgImpl.BuildDate()
+	if buildDate.IsZero() || buildDate.After(time.Now().AddDate(1, 0, 0)) {
+		t.Fatalf("unexpected build date for %q: %v", pkg.Name(), buildDate)
+	}
+	installDate := pkgImpl.InstallDate()
+	if installDate.IsZero() || installDate.After(time.Now().AddDate(1, 0, 0)) {
+		t.Fatalf("unexpected install date for %q: %v", pkg.Name(), installDate)
+	}
 
 	if err := pkgImpl.CheckMD5Sum(); err != nil {
 		t.Logf("CheckMD5Sum returned error for %s: %v", pkg.Name(), err)
